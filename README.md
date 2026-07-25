@@ -69,6 +69,28 @@ curl -s -X POST http://localhost:4000/api/v1/auth/login \
 
 Home shell includes Clock In/Out, People, Sync, Settings, Status, Power. Camera preview is live (P0 stub); face matching is Phase 1.
 
+## Deploy on Vercel
+
+This API is wired for Vercel serverless (`vercel.json` + `backend/api/index.js`).
+
+1. Push this repo to GitHub (Vercel reads from git).
+2. In Vercel → Project → **Settings → Environment Variables**, add:
+
+| Name | Value |
+|------|--------|
+| `MONGODB_URI` | MongoDB Atlas connection string |
+| `JWT_SECRET` | long random secret |
+| `USE_MEMORY_DB` | `false` |
+| `ADMIN_EMAIL` | `admin@presence.local` |
+| `ADMIN_PASSWORD` | strong password |
+| `NODE_ENV` | `production` |
+
+3. Redeploy.
+4. Open `https://your-app.vercel.app/health` — should return `"status":"ok"`.
+5. In the Android app Settings, set API URL to `https://your-app.vercel.app/api/v1`.
+
+You need a free [MongoDB Atlas](https://www.mongodb.com/atlas) cluster; local MongoDB will not work on Vercel.
+
 ## Phase status
 
 | Phase | Status |

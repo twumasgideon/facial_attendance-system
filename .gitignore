@@ -1,0 +1,25 @@
+node_modules/
+.env
+*.log
+.DS_Store
+dist/
+build/
+coverage/
+.idea/
+.vscode/
+*.iml
+
+# Android
+android/.gradle/
+android/local.properties
+android/**/build/
+android/captures/
+android/.cxx/
+android/*.apk
+android/*.aab
+android/app/release/
+
+# Local Mongo data / temp
+.data/
+*.pid
+.mongo-memory/
