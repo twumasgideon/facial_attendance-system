@@ -69,6 +69,33 @@ curl -s -X POST http://localhost:4000/api/v1/auth/login \
 
 Home shell includes Clock In/Out, People, Sync, Settings, Status, Power. Camera preview is live (P0 stub); face matching is Phase 1.
 
+## Deploy on Render
+
+Do **not** choose Rust. This service must be **Node**.
+
+### Fix an existing failed service
+1. Render → your service → **Settings**
+2. **Runtime** → **Node**
+3. **Root Directory** → `backend`
+4. **Build Command** → `npm install`
+5. **Start Command** → `npm start`
+6. **Environment** → add:
+
+| Key | Value |
+|-----|--------|
+| `MONGODB_URI` | MongoDB Atlas URI |
+| `JWT_SECRET` | long random secret |
+| `USE_MEMORY_DB` | `false` |
+| `NODE_ENV` | `production` |
+| `ADMIN_EMAIL` | `admin@presence.local` |
+| `ADMIN_PASSWORD` | your password |
+
+7. **Manual Deploy** → clear build cache & deploy
+
+Or delete the Rust service and create a new **Web Service** with runtime **Node**, root `backend`.
+
+A `render.yaml` is included at the repo root for Blueprint deploys.
+
 ## Deploy on Vercel
 
 This API is wired for Vercel serverless (`vercel.json` + `backend/api/index.js`).
