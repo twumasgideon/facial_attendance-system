@@ -69,6 +69,29 @@ curl -s -X POST http://localhost:4000/api/v1/auth/login \
 
 Home shell includes Clock In/Out, People, Sync, Settings, Status, Power. Camera preview is live (P0 stub); face matching is Phase 1.
 
+## Mobile app (Android + iOS)
+
+Cross-platform Expo app in `mobile/` — one codebase for phones and tablets.
+
+```bash
+cd mobile
+npm install
+npx expo start
+```
+
+Then:
+- Scan the QR code with **Expo Go** on Android or iOS, or
+- Press `a` for Android emulator / `i` for iOS simulator (Mac)
+
+**First-run setup in the app**
+1. Open **Settings**
+2. API URL is prefilled to Vercel (`…/api/v1`) — or use Render
+3. **Login** with `admin@presence.local` / `Admin123!`
+4. **Register this device** (branch `HQ01`)
+5. Use **Clock In / Out**, **People**, **Face Sync**
+
+Native Kotlin tablet shell remains under `android/` for the dedicated kiosk track.
+
 ## Deploy on Render
 
 Do **not** choose Rust. This service must be **Node**.
