@@ -5,6 +5,7 @@ const Department = require('../models/Department');
 const { hashPassword } = require('../utils/auth');
 const { ok, fail } = require('../utils/response');
 const { validate } = require('../middleware/validate');
+const { ensureDefaultBranch } = require('../utils/ensureDefaults');
 
 const ADMIN_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'BRANCH_MANAGER'];
 
@@ -115,7 +116,7 @@ async function getEmployee(req, res) {
 const createValidators = [
   body('employeeId').isString().trim().notEmpty(),
   body('fullName').isString().trim().notEmpty(),
-  body('branchCode').isString().trim().notEmpty(),
+  body('branchCode').optional().isString().trim(),
   body('email').optional({ nullable: true }).isEmail(),
   body('phone').optional().isString(),
   body('position').optional().isString(),
@@ -145,9 +146,12 @@ async function createEmployee(req, res) {
     return fail(res, 'Employee ID already exists', 409);
   }
 
-  const branch = await Branch.findOne({ code: String(branchCode).toUpperCase(), isActive: true });
+  let branch = null;
+  if (branchCode) {
+    branch = await Branch.findOne({ code: String(branchCode).toUpperCase(), isActive: true });
+  }
   if (!branch) {
-    return fail(res, 'Branch not found. Create/register the branch first.', 404);
+    ({ branch } = await ensureDefaultBranch());
   }
 
   const safeEmail = (email || `${id.toLowerCase()}@presence.local`).toLowerCase().trim();

@@ -15,7 +15,7 @@ import * as Battery from 'expo-battery';
 import * as Device from 'expo-device';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { APP_NAME, APP_TAGLINE, colors } from '../theme';
+import { APP_TAGLINE, colors } from '../theme';
 import { AppSettings, listEmployees, loadSettings, saveSettings } from '../api';
 import { RootStackParamList } from '../navigation';
 import Screen from '../components/Screen';
@@ -151,12 +151,12 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={styles.org}>
               {settings.organizationName
                 ? settings.organizationName.toUpperCase()
-                : APP_NAME.toUpperCase()}
+                : 'KASSE CHURCH OF PENTECOST'}
             </Text>
             <Text style={styles.branch}>
               {settings.branchName
                 ? settings.branchName.toUpperCase()
-                : 'Register device in Settings'}
+                : 'Kasse Assembly · Kumasi'}
             </Text>
           </View>
           <Pressable

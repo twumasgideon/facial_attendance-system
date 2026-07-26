@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,66 +16,33 @@ import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
-import { createBranch, listBranches, loadSettings, registerMember } from '../api';
+import { loadSettings, registerMember } from '../api';
 import { RootStackParamList } from '../navigation';
 import FaceCaptureModal from '../components/FaceCaptureModal';
 import Screen from '../components/Screen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterMember'>;
 
-type BranchOption = {
-  code: string;
-  name: string;
-  organizationName: string;
-};
-
 export default function RegisterMemberScreen({ navigation }: Props) {
   const [employeeId, setEmployeeId] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [position, setPosition] = useState('');
+  const [position, setPosition] = useState('Member');
   const [departmentName, setDepartmentName] = useState('General');
-  const [branchCode, setBranchCode] = useState('');
-  const [branches, setBranches] = useState<BranchOption[]>([]);
   const [photoUri, setPhotoUri] = useState('');
   const [photoBase64, setPhotoBase64] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [showNewBranch, setShowNewBranch] = useState(false);
-  const [newBranchCode, setNewBranchCode] = useState('');
-  const [newBranchName, setNewBranchName] = useState('');
-  const [newOrgName, setNewOrgName] = useState('');
   const [showFaceCam, setShowFaceCam] = useState(false);
 
-  const refreshBranches = useCallback(async () => {
-    const settings = await loadSettings();
-    if (!settings.token) {
-      setMessage('Login as admin in Settings first');
-      return;
-    }
-    try {
-      const res = await listBranches();
-      if (res.success && res.data?.branches) {
-        const list = res.data.branches as BranchOption[];
-        setBranches(list);
-        if (!branchCode) {
-          const preferred =
-            list.find((b) => b.code === settings.branchCode)?.code || list[0]?.code || '';
-          setBranchCode(preferred);
-        }
-      } else {
-        setMessage(res.message || 'Could not load branches');
-      }
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : 'Network error');
-    }
-  }, [branchCode]);
-
   useFocusEffect(
-    useCallback(() => {
-      refreshBranches();
-    }, [refreshBranches]),
+    React.useCallback(() => {
+      loadSettings().then((s) => {
+        if (!s.token) setMessage('Login as admin in Settings first');
+        else setMessage('');
+      });
+    }, []),
   );
 
   function onFaceCaptured(base64: string, uri: string) {
@@ -103,39 +70,9 @@ export default function RegisterMemberScreen({ navigation }: Props) {
     }
   }
 
-  async function onCreateBranch() {
-    if (!newBranchCode.trim() || !newBranchName.trim() || !newOrgName.trim()) {
-      Alert.alert('Missing fields', 'Branch code, name, and organization are required.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await createBranch({
-        code: newBranchCode.trim().toUpperCase(),
-        name: newBranchName.trim(),
-        organizationName: newOrgName.trim(),
-      });
-      if (res.success) {
-        setShowNewBranch(false);
-        setBranchCode(newBranchCode.trim().toUpperCase());
-        setNewBranchCode('');
-        setNewBranchName('');
-        setNewOrgName('');
-        await refreshBranches();
-        setMessage('Branch created');
-      } else {
-        Alert.alert('Failed', res.message || 'Could not create branch');
-      }
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Network error');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function onSubmit() {
-    if (!employeeId.trim() || !fullName.trim() || !branchCode.trim()) {
-      Alert.alert('Missing fields', 'Employee ID, full name, and branch are required.');
+    if (!employeeId.trim() || !fullName.trim()) {
+      Alert.alert('Missing fields', 'Employee ID and full name are required.');
       return;
     }
     if (!photoBase64) {
@@ -151,10 +88,9 @@ export default function RegisterMemberScreen({ navigation }: Props) {
         fullName: fullName.trim(),
         email: email.trim() || undefined,
         phone: phone.trim(),
-        position: position.trim(),
+        position: position.trim() || 'Member',
         departmentCode: 'GEN',
         departmentName: departmentName.trim() || 'General',
-        branchCode: branchCode.trim().toUpperCase(),
         photoBase64,
       });
       if (res.success) {
@@ -171,7 +107,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
                 setFullName('');
                 setEmail('');
                 setPhone('');
-                setPosition('');
+                setPosition('Member');
                 setPhotoUri('');
                 setPhotoBase64('');
                 setMessage('Ready for next member');
@@ -218,7 +154,9 @@ export default function RegisterMemberScreen({ navigation }: Props) {
             </View>
           )}
           <Text style={styles.photoCaption}>
-            {photoUri ? 'Face registered — used for clock-in / clock-out' : 'Capture the member’s face to enable clock-in with their Employee ID'}
+            {photoUri
+              ? 'Face registered — used for clock-in / clock-out'
+              : 'Capture the member’s face to enable clock-in with their Employee ID'}
           </Text>
           <View style={styles.photoActions}>
             <Pressable style={styles.photoBtn} onPress={() => setShowFaceCam(true)}>
@@ -239,49 +177,32 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           onCapture={onFaceCaptured}
         />
 
-        <Field label="Employee ID *" value={employeeId} onChangeText={setEmployeeId} autoCapitalize="characters" placeholder="EMP004" />
+        <Field
+          label="Employee ID *"
+          value={employeeId}
+          onChangeText={setEmployeeId}
+          autoCapitalize="characters"
+          placeholder="EMP004"
+        />
         <Field label="Full name *" value={fullName} onChangeText={setFullName} placeholder="Jane Doe" />
-        <Field label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="optional" />
+        <Field
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          placeholder="optional"
+        />
         <Field label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
-        <Field label="Position" value={position} onChangeText={setPosition} placeholder="Teller" />
+        <Field label="Position" value={position} onChangeText={setPosition} placeholder="Member" />
         <Field label="Department" value={departmentName} onChangeText={setDepartmentName} />
 
-        <Text style={styles.label}>Branch *</Text>
-        <View style={styles.branchList}>
-          {branches.length === 0 ? (
-            <Text style={styles.emptyBranches}>No branches yet — create one below.</Text>
-          ) : (
-            branches.map((b) => (
-              <Pressable
-                key={b.code}
-                style={[styles.branchChip, branchCode === b.code && styles.branchChipActive]}
-                onPress={() => setBranchCode(b.code)}
-              >
-                <Text style={[styles.branchChipText, branchCode === b.code && styles.branchChipTextActive]}>
-                  {b.code} · {b.name}
-                </Text>
-              </Pressable>
-            ))
-          )}
-        </View>
-
-        <Pressable onPress={() => setShowNewBranch((v) => !v)}>
-          <Text style={styles.link}>{showNewBranch ? 'Hide new branch' : '+ Create new branch'}</Text>
-        </Pressable>
-
-        {showNewBranch && (
-          <View style={styles.newBranchBox}>
-            <Field label="Branch code" value={newBranchCode} onChangeText={setNewBranchCode} autoCapitalize="characters" placeholder="BR02" />
-            <Field label="Branch name" value={newBranchName} onChangeText={setNewBranchName} placeholder="Main Branch" />
-            <Field label="Organization name" value={newOrgName} onChangeText={setNewOrgName} placeholder="Kasse Church of Pentecost" />
-            <Pressable style={[styles.submit, styles.secondary]} onPress={onCreateBranch} disabled={busy}>
-              <Text style={[styles.submitText, { color: colors.teal }]}>Save branch</Text>
-            </Pressable>
-          </View>
-        )}
-
         <Pressable style={[styles.submit, busy && styles.disabled]} onPress={onSubmit} disabled={busy}>
-          {busy ? <ActivityIndicator color={colors.white} /> : <Text style={styles.submitText}>Register member</Text>}
+          {busy ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Text style={styles.submitText}>Register member</Text>
+          )}
         </Pressable>
         {!!message && <Text style={styles.message}>{message}</Text>}
         {Platform.OS === 'web' && (
@@ -328,7 +249,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   photoHint: { color: colors.textMuted, fontSize: 12 },
-  photoCaption: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: 12, paddingHorizontal: 8 },
+  photoCaption: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
   photoActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   photoBtn: {
     flexDirection: 'row',
@@ -355,26 +282,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: colors.text,
   },
-  branchList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
-  branchChip: {
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: colors.panel,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  branchChipActive: { backgroundColor: colors.tileClock, borderColor: colors.tileClock },
-  branchChipText: { color: colors.textMuted, fontWeight: '600', fontSize: 13 },
-  branchChipTextActive: { color: colors.white },
-  emptyBranches: { color: colors.textMuted, marginBottom: 8 },
-  link: { color: colors.teal, fontWeight: '700', marginBottom: 12 },
-  newBranchBox: {
-    backgroundColor: colors.panel,
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 12,
-  },
   submit: {
     marginTop: 8,
     backgroundColor: colors.tileSync,
@@ -382,7 +289,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
   },
-  secondary: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.teal },
   submitText: { color: colors.white, fontWeight: '800', fontSize: 16 },
   disabled: { opacity: 0.6 },
   message: { marginTop: 12, color: colors.teal, fontWeight: '600' },

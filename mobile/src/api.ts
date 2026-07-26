@@ -157,7 +157,7 @@ export async function registerMember(body: {
   position?: string;
   departmentCode?: string;
   departmentName?: string;
-  branchCode: string;
+  branchCode?: string;
   photoBase64?: string;
 }) {
   return request<{ user: Record<string, unknown> }>('/employees', {

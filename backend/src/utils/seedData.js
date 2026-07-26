@@ -1,27 +1,17 @@
-const Branch = require('../models/Branch');
-const Department = require('../models/Department');
 const User = require('../models/User');
 const config = require('../config');
 const { hashPassword } = require('../utils/auth');
+const { ensureDefaultBranch, DEFAULT_BRANCH } = require('./ensureDefaults');
 
 async function seedIfEmpty() {
   const existingAdmin = await User.findOne({ email: config.adminEmail.toLowerCase() });
+  // Always ensure the default Kasse branch exists, even if admin already seeded.
+  await ensureDefaultBranch();
   if (existingAdmin) {
     return false;
   }
 
-  const branch = await Branch.create({
-    code: 'HQ01',
-    name: 'Sofoline',
-    organizationName: 'Presence Demo Org',
-    address: 'Sofoline Branch',
-  });
-
-  const dept = await Department.create({
-    code: 'OPS',
-    name: 'Operations',
-    branch: branch._id,
-  });
+  const { branch, department: dept } = await ensureDefaultBranch();
 
   await User.create({
     employeeId: 'ADMIN001',
@@ -37,9 +27,9 @@ async function seedIfEmpty() {
   });
 
   const demoEmployees = [
-    { employeeId: 'EMP001', fullName: 'Gideon Mensah', email: 'gideon@presence.local', position: 'Teller' },
-    { employeeId: 'EMP002', fullName: 'Ama Owusu', email: 'ama@presence.local', position: 'HR Officer' },
-    { employeeId: 'EMP003', fullName: 'Kojo Asante', email: 'kojo@presence.local', position: 'Security' },
+    { employeeId: 'EMP001', fullName: 'Gideon Mensah', email: 'gideon@presence.local', position: 'Member' },
+    { employeeId: 'EMP002', fullName: 'Ama Owusu', email: 'ama@presence.local', position: 'Member' },
+    { employeeId: 'EMP003', fullName: 'Kojo Asante', email: 'kojo@presence.local', position: 'Member' },
   ];
 
   for (const emp of demoEmployees) {
@@ -54,7 +44,7 @@ async function seedIfEmpty() {
     });
   }
 
-  console.log('Seeded demo branch HQ01, admin, and 3 employees');
+  console.log(`Seeded ${DEFAULT_BRANCH.code}, admin, and 3 members`);
   return true;
 }
 

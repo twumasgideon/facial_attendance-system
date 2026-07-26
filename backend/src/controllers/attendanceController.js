@@ -1,10 +1,9 @@
 const { body } = require('express-validator');
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
-const Device = require('../models/Device');
-const Branch = require('../models/Branch');
 const { ok, fail } = require('../utils/response');
 const { validate } = require('../middleware/validate');
+const { ensureDevice } = require('../utils/ensureDefaults');
 const {
   SCHEDULE,
   ghanaDayBounds,
@@ -111,7 +110,7 @@ async function runAutoClockOut(now = new Date()) {
 
 const createValidators = [
   body('employeeId').isString().trim().notEmpty(),
-  body('deviceId').isString().trim().notEmpty(),
+  body('deviceId').optional().isString().trim(),
   body('attendanceType').isIn(['CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END']),
   body('timestamp').isISO8601(),
   body('faceScore').optional().isFloat({ min: 0, max: 100 }),
@@ -123,11 +122,10 @@ const createValidators = [
 async function createAttendance(req, res) {
   const {
     employeeId,
-    deviceId,
+    deviceId: rawDeviceId,
     attendanceType,
     timestamp,
     faceScore,
-    branch: branchCode,
     clientEventId,
     gps,
     imageSnapshotUrl,
@@ -137,8 +135,10 @@ async function createAttendance(req, res) {
   // Keep the day's register clean: auto-close anyone still open after 2 PM.
   await runAutoClockOut(new Date());
 
+  const deviceId = String(rawDeviceId || 'KASSE-PHONE').toUpperCase().trim();
+
   if (clientEventId) {
-    const existing = await Attendance.findOne({ clientEventId, deviceId: deviceId.toUpperCase() });
+    const existing = await Attendance.findOne({ clientEventId, deviceId });
     if (existing) {
       return ok(res, { attendance: serializeAttendance(existing), deduplicated: true });
     }
@@ -153,24 +153,12 @@ async function createAttendance(req, res) {
     return fail(res, 'Face not registered for this employee. Register their face first.', 400);
   }
 
-  const device = await Device.findOne({ deviceId: deviceId.toUpperCase() });
-  if (!device) {
-    return fail(res, 'Device not found', 404);
-  }
-  if (!device.isAuthorized) {
-    return fail(res, 'Device is not authorized', 403);
-  }
-
-  let branch = null;
-  if (branchCode) {
-    branch = await Branch.findOne({ code: String(branchCode).toUpperCase() });
-  }
-  if (!branch) {
-    branch = await Branch.findById(device.branch);
-  }
-  if (!branch) {
-    return fail(res, 'Branch not found', 404);
-  }
+  // Auto-create/authorize device — no manual Register Device step.
+  const { device, branch } = await ensureDevice({
+    deviceId,
+    name: 'Kasse CoP Phone',
+    platform: 'ANDROID',
+  });
 
   const eventTime = new Date(timestamp);
   let status = 'OK';

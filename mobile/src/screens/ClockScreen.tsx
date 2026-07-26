@@ -77,11 +77,10 @@ export default function ClockScreen({ navigation }: Props) {
       }
       const res = await createAttendance({
         employeeId: employeeId.trim().toUpperCase(),
-        deviceId: settings.deviceId || 'MOB001',
+        deviceId: settings.deviceId || 'KASSE-PHONE',
         attendanceType: type,
         timestamp: new Date().toISOString(),
         faceImageBase64: faceImageBase64 || undefined,
-        branch: settings.branchCode,
         clientEventId: `mob-${Date.now()}`,
       });
       if (res.success) {
