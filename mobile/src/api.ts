@@ -115,6 +115,17 @@ export async function listEmployees(q = '') {
   return request<{ users: Array<Record<string, unknown>> }>(`/employees${query}`);
 }
 
+export async function getEmployee(employeeId: string) {
+  return request<{
+    user: {
+      employeeId: string;
+      fullName: string;
+      photoUrl?: string;
+      faceStatus?: string;
+    };
+  }>(`/employees/${encodeURIComponent(employeeId)}`);
+}
+
 export async function listBranches() {
   return request<{
     branches: Array<{
@@ -197,8 +208,17 @@ export async function createAttendance(payload: {
   faceScore?: number;
   branch?: string;
   clientEventId?: string;
+  faceImageBase64?: string;
 }) {
-  return request<{ attendance: Record<string, unknown> }>('/attendance', {
+  return request<{
+    attendance: Record<string, unknown>;
+    employee?: {
+      employeeId: string;
+      fullName: string;
+      photoUrl?: string;
+      faceStatus?: string;
+    };
+  }>('/attendance', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

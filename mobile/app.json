@@ -31,9 +31,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "CAMERA",
-        "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -57,7 +58,11 @@
       "expo-font"
     ],
     "extra": {
-      "apiUrl": "https://facial-attendance-system-wheat.vercel.app/api/v1"
-    }
+      "apiUrl": "https://facial-attendance-system-wheat.vercel.app/api/v1",
+      "eas": {
+        "projectId": "094d9f7b-231a-4336-882f-005331fd6cb8"
+      }
+    },
+    "owner": "katg"
   }
 }

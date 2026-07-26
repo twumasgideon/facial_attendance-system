@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Pressable,
   SafeAreaView,
@@ -11,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useIsFocused } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { createAttendance, loadSettings } from '../api';
@@ -19,12 +21,18 @@ import { RootStackParamList } from '../navigation';
 type Props = NativeStackScreenProps<RootStackParamList, 'Clock'>;
 
 export default function ClockScreen({ navigation }: Props) {
+  const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
-  const [employeeId, setEmployeeId] = useState('EMP001');
+  const cameraRef = useRef<CameraView>(null);
+  const [employeeId, setEmployeeId] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Position your face in the frame');
+  const [status, setStatus] = useState('Enter Employee ID and position your face');
   const [welcomeName, setWelcomeName] = useState('');
+  const [registeredPhoto, setRegisteredPhoto] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Stop camera after success, while leaving the screen, or during submit.
+  const cameraOn = isFocused && !!permission?.granted && !showSuccess && !busy;
 
   useEffect(() => {
     if (permission && !permission.granted) {
@@ -32,7 +40,29 @@ export default function ClockScreen({ navigation }: Props) {
     }
   }, [permission, requestPermission]);
 
+  useEffect(() => {
+    const unsub = navigation.addListener('blur', () => {
+      setShowSuccess(false);
+    });
+    return unsub;
+  }, [navigation]);
+
   async function submit(type: 'CLOCK_IN' | 'CLOCK_OUT') {
+    if (!employeeId.trim()) {
+      setStatus('Enter the Employee ID first');
+      return;
+    }
+
+    // Capture the live face while the camera is still on (before busy stops it).
+    let faceImageBase64 = '';
+    setStatus('Scanning face...');
+    try {
+      const pic = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.5 });
+      faceImageBase64 = pic?.base64 || '';
+    } catch {
+      // proceed without image if capture is unavailable (e.g. web)
+    }
+
     setBusy(true);
     setStatus('Recording attendance...');
     try {
@@ -46,15 +76,16 @@ export default function ClockScreen({ navigation }: Props) {
         deviceId: settings.deviceId || 'MOB001',
         attendanceType: type,
         timestamp: new Date().toISOString(),
-        faceScore: 98.5,
+        faceImageBase64: faceImageBase64 || undefined,
         branch: settings.branchCode,
         clientEventId: `mob-${Date.now()}`,
       });
       if (res.success) {
         const name = (res.data?.attendance?.fullName as string) || employeeId;
         setWelcomeName(name);
+        setRegisteredPhoto(res.data?.employee?.photoUrl || '');
         setShowSuccess(true);
-        setStatus('Recording attendance...');
+        setStatus('Attendance recorded');
       } else {
         setStatus(res.message || 'Attendance failed');
       }
@@ -65,10 +96,15 @@ export default function ClockScreen({ navigation }: Props) {
     }
   }
 
+  function closeAndLeave() {
+    setShowSuccess(false);
+    navigation.goBack();
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Pressable onPress={closeAndLeave} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.text} />
           <Text style={styles.back}>Back</Text>
         </Pressable>
@@ -76,8 +112,15 @@ export default function ClockScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.cameraWrap}>
-        {permission?.granted ? (
-          <CameraView style={styles.camera} facing="front" />
+        {cameraOn ? (
+          <CameraView ref={cameraRef} style={styles.camera} facing="front" active={cameraOn} />
+        ) : permission?.granted ? (
+          <View style={styles.cameraFallback}>
+            <Ionicons name="videocam-off" size={36} color={colors.textMuted} />
+            <Text style={styles.fallbackText}>
+              {showSuccess ? 'Camera off' : busy ? 'Processing…' : 'Camera paused'}
+            </Text>
+          </View>
         ) : (
           <View style={styles.cameraFallback}>
             <Text style={styles.fallbackText}>Camera permission needed</Text>
@@ -86,9 +129,11 @@ export default function ClockScreen({ navigation }: Props) {
             </Pressable>
           </View>
         )}
-        <View style={styles.overlay}>
-          <View style={styles.frame} />
-        </View>
+        {cameraOn && (
+          <View style={styles.overlay}>
+            <View style={styles.frame} />
+          </View>
+        )}
       </View>
 
       <Text style={styles.status}>{status}</Text>
@@ -99,12 +144,13 @@ export default function ClockScreen({ navigation }: Props) {
         autoCapitalize="characters"
         placeholder="Employee ID"
         placeholderTextColor={colors.textMuted}
+        editable={!busy && !showSuccess}
       />
 
       <View style={styles.row}>
         <Pressable
-          style={[styles.primaryBtn, styles.flex, busy && styles.disabled]}
-          disabled={busy}
+          style={[styles.primaryBtn, styles.flex, (busy || showSuccess) && styles.disabled]}
+          disabled={busy || showSuccess}
           onPress={() => submit('CLOCK_IN')}
         >
           {busy ? (
@@ -114,32 +160,30 @@ export default function ClockScreen({ navigation }: Props) {
           )}
         </Pressable>
         <Pressable
-          style={[styles.secondaryBtn, styles.flex, busy && styles.disabled]}
-          disabled={busy}
+          style={[styles.secondaryBtn, styles.flex, (busy || showSuccess) && styles.disabled]}
+          disabled={busy || showSuccess}
           onPress={() => submit('CLOCK_OUT')}
         >
           <Text style={styles.secondaryText}>Clock Out</Text>
         </Pressable>
       </View>
 
-      <Modal visible={showSuccess} transparent animationType="fade">
+      <Modal visible={showSuccess} transparent animationType="fade" onRequestClose={closeAndLeave}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Attendance Recorded</Text>
-            <View style={styles.checkCircle}>
-              <Ionicons name="checkmark" size={48} color={colors.white} />
-            </View>
+            {registeredPhoto ? (
+              <Image source={{ uri: registeredPhoto }} style={styles.registeredFace} />
+            ) : (
+              <View style={styles.checkCircle}>
+                <Ionicons name="checkmark" size={48} color={colors.white} />
+              </View>
+            )}
             <Text style={styles.welcome}>Welcome {welcomeName}!!</Text>
             <Text style={styles.modalBody}>
               Attendance data received and queued for processing.
             </Text>
-            <Pressable
-              style={styles.continueBtn}
-              onPress={() => {
-                setShowSuccess(false);
-                navigation.navigate('Home');
-              }}
-            >
+            <Pressable style={styles.continueBtn} onPress={closeAndLeave}>
               <Text style={styles.continueText}>Continue</Text>
             </Pressable>
           </View>
@@ -156,8 +200,11 @@ const styles = StyleSheet.create({
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
   title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },
   cameraWrap: {
-    height: 340,
-    borderRadius: 24,
+    height: 200,
+    width: '100%',
+    maxWidth: 280,
+    alignSelf: 'center',
+    borderRadius: 20,
     overflow: 'hidden',
     backgroundColor: colors.panel,
   },
@@ -172,10 +219,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   frame: {
-    width: 220,
-    height: 260,
-    borderRadius: 24,
-    borderWidth: 3,
+    width: 140,
+    height: 160,
+    borderRadius: 18,
+    borderWidth: 2,
     borderColor: 'rgba(20,184,166,0.85)',
   },
   cameraFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
@@ -235,6 +282,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  registeredFace: {
+    marginTop: 22,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 3,
+    borderColor: colors.success,
+    backgroundColor: colors.inputBg,
   },
   welcome: { marginTop: 18, color: colors.white, fontSize: 24, fontWeight: '800' },
   modalBody: {

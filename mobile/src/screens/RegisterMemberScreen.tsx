@@ -19,6 +19,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { createBranch, listBranches, loadSettings, registerMember } from '../api';
 import { RootStackParamList } from '../navigation';
+import FaceCaptureModal from '../components/FaceCaptureModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterMember'>;
 
@@ -45,6 +46,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
   const [newBranchCode, setNewBranchCode] = useState('');
   const [newBranchName, setNewBranchName] = useState('');
   const [newOrgName, setNewOrgName] = useState('');
+  const [showFaceCam, setShowFaceCam] = useState(false);
 
   const refreshBranches = useCallback(async () => {
     const settings = await loadSettings();
@@ -76,23 +78,10 @@ export default function RegisterMemberScreen({ navigation }: Props) {
     }, [refreshBranches]),
   );
 
-  async function pickFromCamera() {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission needed', 'Camera access is required to capture a face photo.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.55,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setPhotoUri(asset.uri);
-      setPhotoBase64(asset.base64 || '');
-    }
+  function onFaceCaptured(base64: string, uri: string) {
+    setPhotoUri(uri);
+    setPhotoBase64(base64);
+    setShowFaceCam(false);
   }
 
   async function pickFromGallery() {
@@ -170,25 +159,30 @@ export default function RegisterMemberScreen({ navigation }: Props) {
       });
       if (res.success) {
         const name = (res.data?.user?.fullName as string) || fullName;
-        Alert.alert('Member registered', `${name} is now in the directory.`, [
-          {
-            text: 'Register another',
-            onPress: () => {
-              setEmployeeId('');
-              setFullName('');
-              setEmail('');
-              setPhone('');
-              setPosition('');
-              setPhotoUri('');
-              setPhotoBase64('');
-              setMessage('Ready for next member');
+        const savedId = employeeId.trim().toUpperCase();
+        Alert.alert(
+          'Member registered',
+          `${name} can now clock in / out using Employee ID ${savedId}.`,
+          [
+            {
+              text: 'Register another',
+              onPress: () => {
+                setEmployeeId('');
+                setFullName('');
+                setEmail('');
+                setPhone('');
+                setPosition('');
+                setPhotoUri('');
+                setPhotoBase64('');
+                setMessage('Ready for next member');
+              },
             },
-          },
-          {
-            text: 'View people',
-            onPress: () => navigation.navigate('People'),
-          },
-        ]);
+            {
+              text: 'Go to clock',
+              onPress: () => navigation.navigate('Clock'),
+            },
+          ],
+        );
         setMessage(`Registered ${name}`);
       } else {
         setMessage(res.message || 'Registration failed');
@@ -219,14 +213,17 @@ export default function RegisterMemberScreen({ navigation }: Props) {
             <Image source={{ uri: photoUri }} style={styles.photo} />
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Ionicons name="person" size={56} color={colors.textMuted} />
-              <Text style={styles.photoHint}>Face photo required</Text>
+              <Ionicons name="scan-outline" size={56} color={colors.textMuted} />
+              <Text style={styles.photoHint}>Register face for clock-in</Text>
             </View>
           )}
+          <Text style={styles.photoCaption}>
+            {photoUri ? 'Face registered — used for clock-in / clock-out' : 'Capture the member’s face to enable clock-in with their Employee ID'}
+          </Text>
           <View style={styles.photoActions}>
-            <Pressable style={styles.photoBtn} onPress={pickFromCamera}>
+            <Pressable style={styles.photoBtn} onPress={() => setShowFaceCam(true)}>
               <Ionicons name="camera" size={18} color={colors.white} />
-              <Text style={styles.photoBtnText}>Camera</Text>
+              <Text style={styles.photoBtnText}>{photoUri ? 'Retake face' : 'Register face'}</Text>
             </Pressable>
             <Pressable style={[styles.photoBtn, styles.photoBtnAlt]} onPress={pickFromGallery}>
               <Ionicons name="images" size={18} color={colors.teal} />
@@ -234,6 +231,13 @@ export default function RegisterMemberScreen({ navigation }: Props) {
             </Pressable>
           </View>
         </View>
+
+        <FaceCaptureModal
+          visible={showFaceCam}
+          title="Register face"
+          onClose={() => setShowFaceCam(false)}
+          onCapture={onFaceCaptured}
+        />
 
         <Field label="Employee ID *" value={employeeId} onChangeText={setEmployeeId} autoCapitalize="characters" placeholder="EMP004" />
         <Field label="Full name *" value={fullName} onChangeText={setFullName} placeholder="Jane Doe" />
@@ -325,6 +329,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   photoHint: { color: colors.textMuted, fontSize: 12 },
+  photoCaption: { color: colors.textMuted, fontSize: 12, textAlign: 'center', marginTop: 12, paddingHorizontal: 8 },
   photoActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   photoBtn: {
     flexDirection: 'row',

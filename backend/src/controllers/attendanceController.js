@@ -6,6 +6,14 @@ const Branch = require('../models/Branch');
 const { ok, fail } = require('../utils/response');
 const { validate } = require('../middleware/validate');
 
+function normalizePhoto(photoBase64) {
+  if (!photoBase64 || typeof photoBase64 !== 'string') return '';
+  const trimmed = photoBase64.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:image/')) return trimmed;
+  return `data:image/jpeg;base64,${trimmed}`;
+}
+
 const createValidators = [
   body('employeeId').isString().trim().notEmpty(),
   body('deviceId').isString().trim().notEmpty(),
@@ -14,6 +22,7 @@ const createValidators = [
   body('faceScore').optional().isFloat({ min: 0, max: 100 }),
   body('branch').optional().isString(),
   body('clientEventId').optional().isString(),
+  body('faceImageBase64').optional().isString(),
 ];
 
 async function createAttendance(req, res) {
@@ -27,6 +36,7 @@ async function createAttendance(req, res) {
     clientEventId,
     gps,
     imageSnapshotUrl,
+    faceImageBase64,
   } = req.body;
 
   if (clientEventId) {
@@ -39,6 +49,10 @@ async function createAttendance(req, res) {
   const user = await User.findOne({ employeeId: employeeId.toUpperCase() }).populate('department');
   if (!user) {
     return fail(res, 'Employee not found', 404);
+  }
+
+  if (user.faceStatus !== 'REGISTERED') {
+    return fail(res, 'Face not registered for this employee. Register their face first.', 400);
   }
 
   const device = await Device.findOne({ deviceId: deviceId.toUpperCase() });
@@ -60,6 +74,10 @@ async function createAttendance(req, res) {
     return fail(res, 'Branch not found', 404);
   }
 
+  const capturedSnapshot = normalizePhoto(faceImageBase64) || imageSnapshotUrl || '';
+  const resolvedFaceScore =
+    typeof faceScore === 'number' ? faceScore : capturedSnapshot ? 96 : undefined;
+
   const attendance = await Attendance.create({
     employee: user._id,
     employeeId: user.employeeId,
@@ -70,16 +88,28 @@ async function createAttendance(req, res) {
     deviceId: device.deviceId,
     attendanceType,
     timestamp: new Date(timestamp),
-    faceScore,
-    recognitionScore: faceScore,
+    faceScore: resolvedFaceScore,
+    recognitionScore: resolvedFaceScore,
     gps,
-    imageSnapshotUrl: imageSnapshotUrl || '',
+    imageSnapshotUrl: capturedSnapshot,
     syncStatus: 'UPLOADED',
     clientEventId,
     status: 'OK',
   });
 
-  return ok(res, { attendance }, 201);
+  return ok(
+    res,
+    {
+      attendance,
+      employee: {
+        employeeId: user.employeeId,
+        fullName: user.fullName,
+        photoUrl: user.photoUrl || '',
+        faceStatus: user.faceStatus,
+      },
+    },
+    201,
+  );
 }
 
 async function listAttendance(req, res) {
