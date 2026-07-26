@@ -29,9 +29,9 @@ export async function loadSettings(): Promise<AppSettings> {
     token: map[KEYS.token] || '',
     deviceId: map[KEYS.deviceId] || '',
     deviceName: map[KEYS.deviceName] || 'Presence Phone',
-    branchCode: map[KEYS.branchCode] || 'HQ01',
-    organizationName: map[KEYS.orgName] || 'Presence Demo Org',
-    branchName: map[KEYS.branchName] || 'Sofoline',
+    branchCode: map[KEYS.branchCode] || '',
+    organizationName: map[KEYS.orgName] || '',
+    branchName: map[KEYS.branchName] || '',
   };
 }
 
@@ -113,6 +113,68 @@ export async function registerDevice(body: {
 export async function listEmployees(q = '') {
   const query = q ? `?q=${encodeURIComponent(q)}` : '';
   return request<{ users: Array<Record<string, unknown>> }>(`/employees${query}`);
+}
+
+export async function listBranches() {
+  return request<{
+    branches: Array<{
+      _id?: string;
+      code: string;
+      name: string;
+      organizationName: string;
+    }>;
+  }>('/branches');
+}
+
+export async function createBranch(body: {
+  code: string;
+  name: string;
+  organizationName: string;
+  address?: string;
+}) {
+  return request<{ branch: Record<string, unknown> }>('/branches', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function registerMember(body: {
+  employeeId: string;
+  fullName: string;
+  email?: string;
+  phone?: string;
+  position?: string;
+  departmentCode?: string;
+  departmentName?: string;
+  branchCode: string;
+  photoBase64?: string;
+}) {
+  return request<{ user: Record<string, unknown> }>('/employees', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateMember(
+  employeeId: string,
+  body: {
+    fullName?: string;
+    phone?: string;
+    position?: string;
+    photoBase64?: string;
+    branchCode?: string;
+  },
+) {
+  return request<{ user: Record<string, unknown> }>(`/employees/${encodeURIComponent(employeeId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deactivateMember(employeeId: string) {
+  return request<{ user: Record<string, unknown> }>(`/employees/${encodeURIComponent(employeeId)}`, {
+    method: 'DELETE',
+  });
 }
 
 export async function listAttendance() {

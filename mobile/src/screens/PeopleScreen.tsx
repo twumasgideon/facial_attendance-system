@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { listEmployees } from '../api';
@@ -23,6 +25,7 @@ type Person = {
   position?: string;
   faceStatus?: string;
   employmentStatus?: string;
+  photoUrl?: string;
 };
 
 export default function PeopleScreen({ navigation }: Props) {
@@ -31,7 +34,7 @@ export default function PeopleScreen({ navigation }: Props) {
   const [people, setPeople] = useState<Person[]>([]);
   const [error, setError] = useState('');
 
-  async function load(search = q) {
+  const load = useCallback(async (search = q) => {
     setLoading(true);
     setError('');
     try {
@@ -43,11 +46,13 @@ export default function PeopleScreen({ navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [q]);
 
-  useEffect(() => {
-    load('');
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      load('');
+    }, [load]),
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -57,6 +62,10 @@ export default function PeopleScreen({ navigation }: Props) {
           <Text style={styles.back}>Back</Text>
         </Pressable>
         <Text style={styles.title}>View People</Text>
+        <Pressable style={styles.addBtn} onPress={() => navigation.navigate('RegisterMember')}>
+          <Ionicons name="person-add" size={18} color={colors.white} />
+          <Text style={styles.addText}>Add</Text>
+        </Pressable>
       </View>
 
       <View style={styles.searchRow}>
@@ -84,9 +93,13 @@ export default function PeopleScreen({ navigation }: Props) {
           contentContainerStyle={{ paddingBottom: 24 }}
           renderItem={({ item }) => (
             <View style={styles.card}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{(item.fullName || '?').slice(0, 1)}</Text>
-              </View>
+              {item.photoUrl ? (
+                <Image source={{ uri: item.photoUrl }} style={styles.avatarImg} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{(item.fullName || '?').slice(0, 1)}</Text>
+                </View>
+              )}
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.fullName}</Text>
                 <Text style={styles.meta}>
@@ -98,7 +111,14 @@ export default function PeopleScreen({ navigation }: Props) {
               </View>
             </View>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No employees found</Text>}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <Text style={styles.empty}>No employees found</Text>
+              <Pressable style={styles.emptyBtn} onPress={() => navigation.navigate('RegisterMember')}>
+                <Text style={styles.emptyBtnText}>Register first member</Text>
+              </Pressable>
+            </View>
+          }
         />
       )}
     </SafeAreaView>
@@ -110,7 +130,17 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
-  title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },
+  title: { marginLeft: 8, flex: 1, fontSize: 20, fontWeight: '800', color: colors.text },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.tileSync,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  addText: { color: colors.white, fontWeight: '700' },
   searchRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   input: {
     flex: 1,
@@ -139,16 +169,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.tilePeople,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  avatarImg: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.inputBg },
   avatarText: { color: colors.white, fontWeight: '800', fontSize: 18 },
   name: { fontSize: 16, fontWeight: '700', color: colors.text },
   meta: { marginTop: 3, color: colors.textMuted, fontSize: 13 },
   error: { color: colors.danger, marginTop: 16 },
-  empty: { textAlign: 'center', color: colors.textMuted, marginTop: 24 },
+  emptyWrap: { alignItems: 'center', marginTop: 40, gap: 12 },
+  empty: { textAlign: 'center', color: colors.textMuted },
+  emptyBtn: {
+    backgroundColor: colors.tileSync,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  emptyBtnText: { color: colors.white, fontWeight: '700' },
 });

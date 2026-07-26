@@ -88,4 +88,44 @@ Returns users (with optional embeddings), departments, branches.
 
 ### GET `/employees`
 
-Query: `q`, `limit`
+Query: `q`, `limit`, `branchCode`
+
+### POST `/employees` (admin)
+
+Register a member with optional face photo (base64).
+
+```json
+{
+  "employeeId": "EMP004",
+  "fullName": "Jane Doe",
+  "email": "jane@presence.local",
+  "phone": "0240000000",
+  "position": "Teller",
+  "departmentCode": "OPS",
+  "departmentName": "Operations",
+  "branchCode": "HQ01",
+  "photoBase64": "data:image/jpeg;base64,..."
+}
+```
+
+### PUT `/employees/:employeeId` (admin)
+
+Update profile and/or face photo.
+
+### DELETE `/employees/:employeeId` (admin)
+
+Soft-deactivate (employmentStatus = TERMINATED).
+
+## Branches
+
+### GET `/branches`
+
+### POST `/branches` (admin)
+
+```json
+{
+  "code": "BR02",
+  "name": "Main Branch",
+  "organizationName": "Your Organization Ltd"
+}
+```

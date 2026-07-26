@@ -23,7 +23,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
   const [email, setEmail] = useState('admin@presence.local');
   const [password, setPassword] = useState('Admin123!');
-  const [branchCode, setBranchCode] = useState('HQ01');
+  const [branchCode, setBranchCode] = useState('');
   const [deviceName, setDeviceName] = useState('Presence Phone');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -121,7 +121,13 @@ export default function SettingsScreen({ navigation }: Props) {
         </View>
 
         <Field label="API URL" value={apiUrl} onChangeText={setApiUrl} />
-        <Field label="Branch code" value={branchCode} onChangeText={setBranchCode} />
+        <Field
+          label="Branch code"
+          value={branchCode}
+          onChangeText={setBranchCode}
+          placeholder="e.g. HQ01 (assigned on registration)"
+          autoCapitalize="characters"
+        />
         <Field label="Device name" value={deviceName} onChangeText={setDeviceName} />
         <Field label="Admin email" value={email} onChangeText={setEmail} autoCapitalize="none" />
         <Field

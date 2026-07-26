@@ -15,7 +15,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.presence.attendance",
       "infoPlist": {
-        "NSCameraUsageDescription": "Presence needs the camera to clock in and out with facial recognition."
+        "NSCameraUsageDescription": "Presence needs the camera for attendance and member face registration.",
+        "NSPhotoLibraryUsageDescription": "Presence needs photo access to register member faces."
       }
     },
     "android": {
@@ -26,7 +27,11 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "permissions": ["CAMERA", "INTERNET", "ACCESS_NETWORK_STATE"]
+      "permissions": [
+        "CAMERA",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,7 +43,15 @@
           "cameraPermission": "Allow Presence to use your camera for attendance."
         }
       ],
-      "expo-secure-store"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Presence to access photos for member face registration.",
+          "cameraPermission": "Allow Presence to use your camera for member face registration."
+        }
+      ],
+      "expo-secure-store",
+      "expo-font"
     ],
     "extra": {
       "apiUrl": "https://facial-attendance-system-wheat.vercel.app/api/v1"

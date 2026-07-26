@@ -109,6 +109,14 @@ export default function HomeScreen({ navigation }: Props) {
       onPress: () => navigation.navigate('Clock'),
     },
     {
+      key: 'register',
+      title: 'Register Member',
+      subtitle: 'Add face & profile',
+      color: '#2563EB',
+      icon: <Ionicons name="person-add" size={36} color={colors.white} />,
+      onPress: () => navigation.navigate('RegisterMember'),
+    },
+    {
       key: 'people',
       title: 'View People',
       subtitle: `${faceCount} synced faces`,
@@ -139,8 +147,16 @@ export default function HomeScreen({ navigation }: Props) {
       <View style={styles.container}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.org}>{settings.organizationName.toUpperCase()}</Text>
-            <Text style={styles.branch}>{settings.branchName.toUpperCase()}</Text>
+            <Text style={styles.org}>
+              {settings.organizationName
+                ? settings.organizationName.toUpperCase()
+                : 'PRESENCE'}
+            </Text>
+            <Text style={styles.branch}>
+              {settings.branchName
+                ? settings.branchName.toUpperCase()
+                : 'Register device in Settings'}
+            </Text>
           </View>
           <Pressable
             style={styles.powerBtn}

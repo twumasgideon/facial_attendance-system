@@ -19,7 +19,7 @@ async function createApp() {
   const app = express();
   app.use(helmet());
   app.use(cors());
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '8mb' }));
   app.use(morgan(config.nodeEnv === 'production' ? 'combined' : 'dev'));
 
   app.get('/', (_req, res) => {
@@ -42,6 +42,11 @@ async function createApp() {
           'POST /api/v1/auth/login',
           'GET /api/v1/auth/me',
           'POST /api/v1/devices/register',
+          'POST /api/v1/branches',
+          'GET /api/v1/branches',
+          'POST /api/v1/employees',
+          'PUT /api/v1/employees/:employeeId',
+          'DELETE /api/v1/employees/:employeeId',
           'POST /api/v1/attendance',
           'GET /api/v1/employees/sync',
         ],
@@ -60,10 +65,13 @@ async function createApp() {
     });
   });
 
+  const branchRoutes = require('./routes/branches');
+
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/devices', deviceRoutes);
   app.use('/api/v1/attendance', attendanceRoutes);
   app.use('/api/v1/employees', employeeRoutes);
+  app.use('/api/v1/branches', branchRoutes);
 
   app.use((_req, res) => fail(res, 'Not found', 404));
 
