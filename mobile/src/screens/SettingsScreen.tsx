@@ -10,6 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as Device from 'expo-device';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, DEFAULT_API_URL } from '../theme';
@@ -112,7 +113,8 @@ export default function SettingsScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <Pressable onPress={() => navigation.goBack()}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
             <Text style={styles.back}>Back</Text>
           </Pressable>
           <Text style={styles.title}>Settings</Text>
@@ -136,7 +138,7 @@ export default function SettingsScreen({ navigation }: Props) {
           {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Login</Text>}
         </Pressable>
         <Pressable style={[styles.btn, styles.secondary]} onPress={onRegisterDevice} disabled={busy}>
-          <Text style={[styles.btnText, { color: colors.blue }]}>Register this device</Text>
+          <Text style={[styles.btnText, { color: colors.teal }]}>Register this device</Text>
         </Pressable>
 
         {!!message && <Text style={styles.message}>{message}</Text>}
@@ -154,40 +156,37 @@ function Field({
   return (
     <View style={{ marginBottom: 12 }}>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        placeholderTextColor={colors.muted}
-        {...props}
-      />
+      <TextInput style={styles.input} placeholderTextColor={colors.textMuted} {...props} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.mist },
+  safe: { flex: 1, backgroundColor: colors.bg },
   container: { padding: 16, paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  back: { color: colors.blue, fontWeight: '700', fontSize: 16 },
-  title: { fontSize: 20, fontWeight: '800', color: colors.ink },
-  label: { marginBottom: 6, color: colors.muted, fontWeight: '600' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  backBtn: { flexDirection: 'row', alignItems: 'center' },
+  back: { color: colors.text, fontWeight: '700', fontSize: 16 },
+  title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },
+  label: { marginBottom: 6, color: colors.textMuted, fontWeight: '600' },
   input: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    color: colors.ink,
+    color: colors.text,
   },
   btn: {
-    backgroundColor: colors.blue,
+    backgroundColor: colors.tileClock,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 8,
   },
-  secondary: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.blue },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  message: { marginTop: 14, color: colors.blue, fontWeight: '600' },
-  meta: { marginTop: 8, color: colors.muted },
+  secondary: { backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.teal },
+  btnText: { color: colors.white, fontWeight: '700', fontSize: 16 },
+  message: { marginTop: 14, color: colors.teal, fontWeight: '600' },
+  meta: { marginTop: 8, color: colors.textMuted },
 });

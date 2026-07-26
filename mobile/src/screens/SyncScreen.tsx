@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { syncFaces } from '../api';
@@ -16,7 +17,9 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Sync'>;
 
 export default function SyncScreen({ navigation }: Props) {
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('Pull employees, departments, and branches from the server.');
+  const [message, setMessage] = useState(
+    'Pull employees, departments, and branches from the server.',
+  );
 
   async function runSync() {
     setBusy(true);
@@ -39,30 +42,48 @@ export default function SyncScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={22} color={colors.text} />
           <Text style={styles.back}>Back</Text>
         </Pressable>
-        <Text style={styles.title}>Face Sync</Text>
+        <Text style={styles.title}>Sync Faces</Text>
       </View>
-      <Text style={styles.body}>{message}</Text>
-      <Pressable style={styles.btn} onPress={runSync} disabled={busy}>
-        {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Sync now</Text>}
-      </Pressable>
+      <View style={styles.card}>
+        <Ionicons name="sync-circle" size={48} color={colors.tileSync} />
+        <Text style={styles.body}>{message}</Text>
+        <Pressable style={styles.btn} onPress={runSync} disabled={busy}>
+          {busy ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.btnText}>Update Database</Text>
+          )}
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.mist, padding: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  back: { color: colors.blue, fontWeight: '700', fontSize: 16 },
-  title: { fontSize: 20, fontWeight: '800', color: colors.ink },
-  body: { fontSize: 15, color: colors.ink, lineHeight: 22, marginBottom: 20 },
+  safe: { flex: 1, backgroundColor: colors.bg, padding: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  backBtn: { flexDirection: 'row', alignItems: 'center' },
+  back: { color: colors.text, fontWeight: '700', fontSize: 16 },
+  title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },
+  card: {
+    backgroundColor: colors.panel,
+    borderRadius: 22,
+    padding: 24,
+    alignItems: 'center',
+    gap: 14,
+  },
+  body: { fontSize: 15, color: colors.text, lineHeight: 22, textAlign: 'center' },
   btn: {
-    backgroundColor: colors.blue,
+    marginTop: 8,
+    alignSelf: 'stretch',
+    backgroundColor: colors.tileSync,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  btnText: { color: colors.white, fontWeight: '700', fontSize: 16 },
 });
