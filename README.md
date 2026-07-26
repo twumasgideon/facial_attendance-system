@@ -69,7 +69,50 @@ curl -s -X POST http://localhost:4000/api/v1/auth/login \
 
 Home shell includes Clock In/Out, People, Sync, Settings, Status, Power. Camera preview is live (P0 stub); face matching is Phase 1.
 
-## Mobile app (Android + iOS)
+## Standalone phone app (no Expo Go)
+
+Install **Presence** as a normal app icon on Android / iPhone using EAS Build (cloud). Your PC does not need Android Studio or a Mac for Android APK builds.
+
+### 1. One-time setup (on your PC)
+
+```bash
+cd /d/facial_attendance-system/mobile
+npm install -g eas-cli
+eas login
+eas init
+```
+
+Use a free Expo account (any email). `eas init` links this project and writes a `projectId` into `app.json`.
+
+### 2. Build Android APK (installable file)
+
+```bash
+cd /d/facial_attendance-system/mobile
+npm run build:android
+```
+
+When the build finishes, open the link EAS prints, download the **.apk**, copy it to the phone, and install it.  
+You will see a **Presence** icon — tap it to open the app (no Expo Go).
+
+### 3. iPhone
+
+```bash
+npm run build:ios
+```
+
+iOS needs an **Apple Developer** account to install on a real iPhone (TestFlight or direct device). Without that, use Android APK or the web/Expo Go path for testing.
+
+### App identity
+
+| Field | Value |
+|-------|--------|
+| App name | Presence |
+| Android package | `com.presence.attendance` |
+| iOS bundle ID | `com.presence.attendance` |
+
+After install: **Settings → Login → Register device**, then use Clock In / Register Member as usual.
+
+## Mobile app (Android + iOS) — Expo Go (dev only)
 
 Cross-platform Expo app in `mobile/` — one codebase for phones and tablets.
 

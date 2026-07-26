@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
+    "scheme": "presence",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -14,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.presence.attendance",
+      "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Presence needs the camera for attendance and member face registration.",
         "NSPhotoLibraryUsageDescription": "Presence needs photo access to register member faces."
@@ -21,6 +23,7 @@
     },
     "android": {
       "package": "com.presence.attendance",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0B5FFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
