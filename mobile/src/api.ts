@@ -150,7 +150,7 @@ export async function createBranch(body: {
 }
 
 export async function registerMember(body: {
-  employeeId: string;
+  employeeId?: string;
   fullName: string;
   email?: string;
   phone?: string;
@@ -160,7 +160,7 @@ export async function registerMember(body: {
   branchCode?: string;
   photoBase64?: string;
 }) {
-  return request<{ user: Record<string, unknown> }>('/employees', {
+  return request<{ user: Record<string, unknown>; memberId?: string }>('/employees', {
     method: 'POST',
     body: JSON.stringify(body),
   });

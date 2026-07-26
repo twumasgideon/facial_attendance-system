@@ -24,7 +24,6 @@ import Screen from '../components/Screen';
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterMember'>;
 
 export default function RegisterMemberScreen({ navigation }: Props) {
-  const [employeeId, setEmployeeId] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -71,8 +70,8 @@ export default function RegisterMemberScreen({ navigation }: Props) {
   }
 
   async function onSubmit() {
-    if (!employeeId.trim() || !fullName.trim()) {
-      Alert.alert('Missing fields', 'Church Member ID and full name are required.');
+    if (!fullName.trim()) {
+      Alert.alert('Missing fields', 'Full name is required.');
       return;
     }
     if (!phone.trim()) {
@@ -88,7 +87,6 @@ export default function RegisterMemberScreen({ navigation }: Props) {
     setMessage('Registering member…');
     try {
       const res = await registerMember({
-        employeeId: employeeId.trim().toUpperCase(),
         fullName: fullName.trim(),
         email: email.trim() || undefined,
         phone: phone.trim(),
@@ -99,15 +97,16 @@ export default function RegisterMemberScreen({ navigation }: Props) {
       });
       if (res.success) {
         const name = (res.data?.user?.fullName as string) || fullName;
-        const savedId = employeeId.trim().toUpperCase();
+        const savedId = String(
+          res.data?.memberId || res.data?.user?.employeeId || '',
+        ).toUpperCase();
         Alert.alert(
           'Member registered',
-          `${name} can now clock in / out using Church Member ID ${savedId}.`,
+          `${name}\nChurch Member ID: ${savedId}\n\nUse this ID to clock in / out.`,
           [
             {
               text: 'Register another',
               onPress: () => {
-                setEmployeeId('');
                 setFullName('');
                 setEmail('');
                 setPhone('');
@@ -123,7 +122,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
             },
           ],
         );
-        setMessage(`Registered ${name}`);
+        setMessage(`Registered ${name} · ID ${savedId}`);
       } else {
         setMessage(res.message || 'Registration failed');
         Alert.alert('Failed', res.message || 'Could not register member');
@@ -160,7 +159,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           <Text style={styles.photoCaption}>
             {photoUri
               ? 'Face registered — used for clock-in / clock-out'
-              : 'Capture the member’s face to enable clock-in with their Church Member ID'}
+              : 'Capture the member’s face. A Church Member ID will be generated automatically.'}
           </Text>
           <View style={styles.photoActions}>
             <Pressable style={styles.photoBtn} onPress={() => setShowFaceCam(true)}>
@@ -181,13 +180,8 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           onCapture={onFaceCaptured}
         />
 
-        <Field
-          label="Church Member ID *"
-          value={employeeId}
-          onChangeText={setEmployeeId}
-          autoCapitalize="characters"
-          placeholder="CM001"
-        />
+        <Text style={styles.autoIdNote}>Church Member ID is generated automatically (e.g. CM001).</Text>
+
         <Field label="Full name *" value={fullName} onChangeText={setFullName} placeholder="Jane Doe" />
         <Field
           label="Phone *"
@@ -282,6 +276,12 @@ const styles = StyleSheet.create({
     borderColor: colors.teal,
   },
   photoBtnText: { color: colors.white, fontWeight: '700' },
+  autoIdNote: {
+    color: colors.accent,
+    fontWeight: '700',
+    marginBottom: 14,
+    fontSize: 13,
+  },
   label: { marginBottom: 6, color: colors.textMuted, fontWeight: '600' },
   input: {
     backgroundColor: colors.inputBg,

@@ -114,7 +114,7 @@ async function getEmployee(req, res) {
 }
 
 const createValidators = [
-  body('employeeId').isString().trim().notEmpty(),
+  body('employeeId').optional({ nullable: true }).isString().trim(),
   body('fullName').isString().trim().notEmpty(),
   body('branchCode').optional().isString().trim(),
   body('email').optional({ nullable: true }).isEmail(),
@@ -125,6 +125,19 @@ const createValidators = [
   body('photoBase64').optional().isString(),
   body('role').optional().isIn(['EMPLOYEE', 'SUPERVISOR', 'BRANCH_MANAGER', 'HR_ADMIN']),
 ];
+
+/** Next Church Member ID like CM001, CM002… */
+async function nextChurchMemberId() {
+  const users = await User.find({ employeeId: /^CM\d+$/i })
+    .select('employeeId')
+    .lean();
+  let max = 0;
+  for (const u of users) {
+    const n = Number(String(u.employeeId).replace(/^CM/i, ''));
+    if (!Number.isNaN(n) && n > max) max = n;
+  }
+  return `CM${String(max + 1).padStart(3, '0')}`;
+}
 
 async function createEmployee(req, res) {
   const {
@@ -140,7 +153,13 @@ async function createEmployee(req, res) {
     role = 'EMPLOYEE',
   } = req.body;
 
-  const id = employeeId.toUpperCase().trim();
+  let id = String(employeeId || '')
+    .toUpperCase()
+    .trim();
+  if (!id) {
+    id = await nextChurchMemberId();
+  }
+
   const existing = await User.findOne({ employeeId: id });
   if (existing) {
     return fail(res, 'Church Member ID already exists', 409);
@@ -159,7 +178,7 @@ async function createEmployee(req, res) {
     ({ branch } = await ensureDefaultBranch());
   }
 
-  const safeEmail = (email || `${id.toLowerCase()}@presence.local`).toLowerCase().trim();
+  const safeEmail = (email || `${id.toLowerCase()}@kasse.cop.local`).toLowerCase().trim();
   const emailTaken = await User.findOne({ email: safeEmail });
   if (emailTaken) {
     return fail(res, 'Email already in use', 409);
@@ -189,7 +208,7 @@ async function createEmployee(req, res) {
   await user.populate('department', 'code name');
   await user.populate('branch', 'code name organizationName');
 
-  return ok(res, { user: user.toSafeJSON() }, 201);
+  return ok(res, { user: user.toSafeJSON(), memberId: id }, 201);
 }
 
 const updateValidators = [
