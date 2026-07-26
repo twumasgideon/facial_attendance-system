@@ -4,7 +4,6 @@ import {
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +16,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { createAttendance, loadSettings } from '../api';
 import { RootStackParamList } from '../navigation';
+import Screen from '../components/Screen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Clock'>;
 
@@ -28,6 +28,10 @@ export default function ClockScreen({ navigation }: Props) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('Enter Employee ID and position your face');
   const [welcomeName, setWelcomeName] = useState('');
+  const [welcomeBody, setWelcomeBody] = useState('');
+  const [stampTime, setStampTime] = useState('');
+  const [attendanceStatus, setAttendanceStatus] = useState('');
+  const [attendanceType, setAttendanceType] = useState<'CLOCK_IN' | 'CLOCK_OUT'>('CLOCK_IN');
   const [registeredPhoto, setRegisteredPhoto] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -82,10 +86,29 @@ export default function ClockScreen({ navigation }: Props) {
       });
       if (res.success) {
         const name = (res.data?.attendance?.fullName as string) || employeeId;
-        setWelcomeName(name);
+        const attStatus = String(res.data?.attendance?.status || '');
+        const stamped =
+          String(res.data?.attendance?.stampedAt || '') ||
+          String(res.data?.attendance?.stampedTime || '');
+        setWelcomeName(res.data?.welcome?.title || `Welcome ${name}!`);
+        setWelcomeBody(
+          res.data?.welcome?.body ||
+            (type === 'CLOCK_IN'
+              ? 'Your presence welcome to the Church of Pentecost Kasse Assembly Kumasi'
+              : 'You have been clocked out. God bless you.'),
+        );
+        setStampTime(stamped);
+        setAttendanceStatus(attStatus);
+        setAttendanceType(type);
         setRegisteredPhoto(res.data?.employee?.photoUrl || '');
         setShowSuccess(true);
-        setStatus('Attendance recorded');
+        setStatus(
+          type === 'CLOCK_IN'
+            ? attStatus === 'LATE'
+              ? 'Clocked in — LATE'
+              : 'Clocked in — On time'
+            : 'Clocked out',
+        );
       } else {
         setStatus(res.message || 'Attendance failed');
       }
@@ -102,7 +125,7 @@ export default function ClockScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen>
       <View style={styles.header}>
         <Pressable onPress={closeAndLeave} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.text} />
@@ -171,7 +194,9 @@ export default function ClockScreen({ navigation }: Props) {
       <Modal visible={showSuccess} transparent animationType="fade" onRequestClose={closeAndLeave}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Attendance Recorded</Text>
+            <Text style={styles.modalTitle}>
+              {attendanceType === 'CLOCK_IN' ? 'Clock-in recorded' : 'Clock-out recorded'}
+            </Text>
             {registeredPhoto ? (
               <Image source={{ uri: registeredPhoto }} style={styles.registeredFace} />
             ) : (
@@ -179,23 +204,35 @@ export default function ClockScreen({ navigation }: Props) {
                 <Ionicons name="checkmark" size={48} color={colors.white} />
               </View>
             )}
-            <Text style={styles.welcome}>Welcome {welcomeName}!!</Text>
-            <Text style={styles.modalBody}>
-              Attendance data received and queued for processing.
-            </Text>
+            <Text style={styles.welcome}>{welcomeName}</Text>
+            <Text style={styles.modalBody}>{welcomeBody}</Text>
+            {!!stampTime && (
+              <Text style={styles.stamp}>Stamp: {stampTime} (Ghana)</Text>
+            )}
+            {attendanceType === 'CLOCK_IN' && !!attendanceStatus && (
+              <View
+                style={[
+                  styles.badge,
+                  attendanceStatus === 'LATE' ? styles.badgeLate : styles.badgeOnTime,
+                ]}
+              >
+                <Text style={styles.badgeText}>
+                  {attendanceStatus === 'LATE' ? 'LATE' : 'ON TIME / PRESENT'}
+                </Text>
+              </View>
+            )}
             <Pressable style={styles.continueBtn} onPress={closeAndLeave}>
               <Text style={styles.continueText}>Continue</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg, padding: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
   title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },
@@ -292,7 +329,7 @@ const styles = StyleSheet.create({
     borderColor: colors.success,
     backgroundColor: colors.inputBg,
   },
-  welcome: { marginTop: 18, color: colors.white, fontSize: 24, fontWeight: '800' },
+  welcome: { marginTop: 18, color: colors.white, fontSize: 22, fontWeight: '800', textAlign: 'center' },
   modalBody: {
     marginTop: 10,
     color: colors.textMuted,
@@ -300,10 +337,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  stamp: {
+    marginTop: 12,
+    color: colors.accent,
+    fontWeight: '700',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  badge: {
+    marginTop: 12,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  badgeOnTime: { backgroundColor: colors.success },
+  badgeLate: { backgroundColor: colors.accentRed },
+  badgeText: { color: colors.white, fontWeight: '800', fontSize: 12, letterSpacing: 0.6 },
   continueBtn: {
     marginTop: 24,
     alignSelf: 'stretch',
-    backgroundColor: colors.teal,
+    backgroundColor: colors.tileClock,
     borderRadius: 16,
     paddingVertical: 14,
     alignItems: 'center',

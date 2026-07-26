@@ -24,6 +24,24 @@ async function authenticate(req, res, next) {
   }
 }
 
+/** Sets req.user when a valid Bearer token is present; never blocks. */
+async function optionalAuthenticate(req, _res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return next();
+  try {
+    const decoded = verifyToken(token);
+    const user = await User.findById(decoded.sub);
+    if (user && user.employmentStatus === 'ACTIVE') {
+      req.user = user;
+      req.auth = decoded;
+    }
+  } catch {
+    /* ignore */
+  }
+  return next();
+}
+
 function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
@@ -33,4 +51,4 @@ function authorize(...roles) {
   };
 }
 
-module.exports = { authenticate, authorize };
+module.exports = { authenticate, optionalAuthenticate, authorize };

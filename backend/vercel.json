@@ -11,5 +11,11 @@
       "src": "/(.*)",
       "dest": "api/index.js"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/attendance/auto-clock-out",
+      "schedule": "5 14 * * *"
+    }
   ]
 }

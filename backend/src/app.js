@@ -48,8 +48,17 @@ async function createApp() {
           'PUT /api/v1/employees/:employeeId',
           'DELETE /api/v1/employees/:employeeId',
           'POST /api/v1/attendance',
+          'GET /api/v1/attendance/today',
+          'POST /api/v1/attendance/auto-clock-out',
           'GET /api/v1/employees/sync',
         ],
+        church: {
+          timezone: 'Africa/Accra',
+          serviceStart: '07:30',
+          lateAfter: '09:30',
+          serviceEnd: '14:00',
+          assembly: 'Church of Pentecost Kasse Assembly Kumasi',
+        },
       },
     });
   });

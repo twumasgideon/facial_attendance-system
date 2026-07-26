@@ -28,7 +28,7 @@ export async function loadSettings(): Promise<AppSettings> {
     apiUrl: map[KEYS.apiUrl] || DEFAULT_API_URL,
     token: map[KEYS.token] || '',
     deviceId: map[KEYS.deviceId] || '',
-    deviceName: map[KEYS.deviceName] || 'Presence Phone',
+    deviceName: map[KEYS.deviceName] || 'Kasse CoP Phone',
     branchCode: map[KEYS.branchCode] || '',
     organizationName: map[KEYS.orgName] || '',
     branchName: map[KEYS.branchName] || '',
@@ -192,6 +192,22 @@ export async function listAttendance() {
   return request<{ records: Array<Record<string, unknown>> }>('/attendance?limit=30');
 }
 
+export async function todayAttendance() {
+  return request<{
+    dateKey: string;
+    timezone: string;
+    schedule: {
+      serviceStart: string;
+      lateAfter: string;
+      serviceEnd: string;
+      assembly: string;
+    };
+    summary: { present: number; late: number; total: number };
+    present: Array<Record<string, unknown>>;
+    late: Array<Record<string, unknown>>;
+  }>('/attendance/today');
+}
+
 export async function syncFaces() {
   return request<{
     syncedAt: string;
@@ -217,6 +233,18 @@ export async function createAttendance(payload: {
       fullName: string;
       photoUrl?: string;
       faceStatus?: string;
+    };
+    welcome?: {
+      title: string;
+      body: string;
+      assembly: string;
+    };
+    schedule?: {
+      timezone: string;
+      serviceStart: string;
+      lateAfter: string;
+      serviceEnd: string;
+      assembly: string;
     };
   }>('/attendance', {
     method: 'POST',

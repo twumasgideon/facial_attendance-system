@@ -2,8 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
+  Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -15,9 +15,10 @@ import * as Battery from 'expo-battery';
 import * as Device from 'expo-device';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { colors } from '../theme';
+import { APP_NAME, APP_TAGLINE, colors } from '../theme';
 import { AppSettings, listEmployees, loadSettings, saveSettings } from '../api';
 import { RootStackParamList } from '../navigation';
+import Screen from '../components/Screen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -112,8 +113,8 @@ export default function HomeScreen({ navigation }: Props) {
       key: 'register',
       title: 'Register Member',
       subtitle: 'Add face & profile',
-      color: '#2563EB',
-      icon: <Ionicons name="person-add" size={36} color={colors.white} />,
+      color: colors.tileRegister,
+      icon: <Ionicons name="person-add" size={36} color={colors.bg} />,
       onPress: () => navigation.navigate('RegisterMember'),
     },
     {
@@ -127,9 +128,9 @@ export default function HomeScreen({ navigation }: Props) {
     {
       key: 'sync',
       title: 'Sync Faces',
-      subtitle: 'Update Database',
+      subtitle: 'Today present / late',
       color: colors.tileSync,
-      icon: <Ionicons name="sync" size={36} color={colors.white} />,
+      icon: <Ionicons name="sync" size={36} color={colors.accent} />,
       onPress: () => navigation.navigate('Sync'),
     },
     {
@@ -143,14 +144,14 @@ export default function HomeScreen({ navigation }: Props) {
   ];
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen padding={20} topGap={20}>
       <View style={styles.container}>
         <View style={styles.topRow}>
-          <View>
+          <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={styles.org}>
               {settings.organizationName
                 ? settings.organizationName.toUpperCase()
-                : 'PRESENCE'}
+                : APP_NAME.toUpperCase()}
             </Text>
             <Text style={styles.branch}>
               {settings.branchName
@@ -178,19 +179,18 @@ export default function HomeScreen({ navigation }: Props) {
             <Ionicons
               name={online ? 'cloud-done-outline' : 'cloud-offline-outline'}
               size={16}
-              color={online ? colors.teal : colors.danger}
+              color={online ? colors.accent : colors.danger}
             />
             <Text style={styles.battery}>{battery}</Text>
           </View>
         </View>
 
         <View style={styles.banner}>
-          <View style={styles.logoMark}>
-            <Text style={styles.logoP}>P</Text>
-          </View>
-          <View>
-            <Text style={styles.logoTitle}>Presence</Text>
-            <Text style={styles.logoTag}>ALWAYS THERE...</Text>
+          <Image source={require('../../assets/cop-logo.png')} style={styles.logoImage} />
+          <View style={styles.bannerText}>
+            <Text style={styles.logoTitle}>Kasse Church</Text>
+            <Text style={styles.logoTitle}>of Pentecost</Text>
+            <Text style={styles.logoTag}>{APP_TAGLINE.toUpperCase()}</Text>
           </View>
         </View>
 
@@ -201,32 +201,36 @@ export default function HomeScreen({ navigation }: Props) {
               style={({ pressed }) => [
                 styles.tile,
                 { backgroundColor: tile.color },
+                tile.key === 'register' && styles.tileYellow,
                 isWide && styles.tileWide,
                 pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
               ]}
               onPress={tile.onPress}
             >
               {tile.icon}
-              <Text style={styles.tileTitle}>{tile.title}</Text>
-              <Text style={styles.tileSub}>{tile.subtitle}</Text>
+              <Text style={[styles.tileTitle, tile.key === 'register' && styles.tileTitleDark]}>
+                {tile.title}
+              </Text>
+              <Text style={[styles.tileSub, tile.key === 'register' && styles.tileSubDark]}>
+                {tile.subtitle}
+              </Text>
             </Pressable>
           ))}
         </View>
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  container: { flex: 1, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 20 },
+  container: { flex: 1 },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  org: { color: colors.text, fontSize: 18, fontWeight: '800', letterSpacing: 0.3 },
+  org: { color: colors.text, fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
   branch: { color: colors.textMuted, fontSize: 13, fontWeight: '600', marginTop: 2 },
   powerBtn: {
     width: 40,
@@ -239,7 +243,7 @@ const styles = StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 14,
     gap: 8,
   },
   statusText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
@@ -247,27 +251,33 @@ const styles = StyleSheet.create({
   statusIcons: { flexDirection: 'row', alignItems: 'center', gap: 10, marginLeft: 'auto' },
   battery: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
   banner: {
-    marginTop: 18,
+    marginTop: 28,
     backgroundColor: colors.banner,
     borderRadius: 22,
-    paddingVertical: 28,
-    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 14,
+    borderWidth: 2,
+    borderColor: colors.accent,
   },
-  logoMark: {
-    width: 54,
-    height: 54,
-    borderRadius: 12,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoImage: {
+    width: 78,
+    height: 52,
+    borderRadius: 8,
+    resizeMode: 'cover',
   },
-  logoP: { color: colors.tileClock, fontSize: 28, fontWeight: '900' },
-  logoTitle: { color: colors.white, fontSize: 28, fontWeight: '800' },
-  logoTag: { color: colors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 1.2 },
+  bannerText: { flexShrink: 1 },
+  logoTitle: { color: colors.white, fontSize: 22, fontWeight: '800', lineHeight: 26 },
+  logoTag: {
+    marginTop: 6,
+    color: colors.accent,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+  },
   grid: {
     marginTop: 18,
     flexDirection: 'row',
@@ -284,7 +294,13 @@ const styles = StyleSheet.create({
     padding: 18,
     justifyContent: 'space-between',
   },
+  tileYellow: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
   tileWide: { width: '22%', minWidth: 160, minHeight: 180 },
   tileTitle: { color: colors.white, fontSize: 20, fontWeight: '800', marginTop: 18 },
+  tileTitleDark: { color: colors.bg },
   tileSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '600', marginTop: 4 },
+  tileSubDark: { color: 'rgba(7,19,58,0.75)' },
 });
