@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme';
+import { SCREEN_TOP_GAP } from './Screen';
 
 type Props = {
   visible: boolean;
@@ -22,6 +24,7 @@ export default function FaceCaptureModal({ visible, title, onClose, onCapture }:
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [busy, setBusy] = React.useState(false);
+  const insets = useSafeAreaInsets();
 
   React.useEffect(() => {
     if (visible && permission && !permission.granted) {
@@ -46,7 +49,15 @@ export default function FaceCaptureModal({ visible, title, onClose, onCapture }:
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top + SCREEN_TOP_GAP,
+            paddingBottom: Math.max(insets.bottom, 16),
+          },
+        ]}
+      >
         <View style={styles.header}>
           <Pressable onPress={onClose} style={styles.close}>
             <Ionicons name="close" size={24} color={colors.text} />
@@ -95,8 +106,8 @@ export default function FaceCaptureModal({ visible, title, onClose, onCapture }:
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, marginTop: 8 },
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   close: { padding: 4 },
   title: { fontSize: 20, fontWeight: '800', color: colors.text },
   cameraWrap: {

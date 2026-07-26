@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,21 +13,44 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Device from 'expo-device';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, DEFAULT_API_URL } from '../theme';
-import { loadSettings, login, registerDevice, saveSettings } from '../api';
+import { listBranches, loadSettings, login, registerDevice, saveSettings } from '../api';
 import { RootStackParamList } from '../navigation';
+import Screen from '../components/Screen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
+
+type BranchOption = { code: string; name: string; organizationName: string };
 
 export default function SettingsScreen({ navigation }: Props) {
   const [apiUrl, setApiUrl] = useState(DEFAULT_API_URL);
   const [email, setEmail] = useState('admin@presence.local');
   const [password, setPassword] = useState('Admin123!');
   const [branchCode, setBranchCode] = useState('');
-  const [deviceName, setDeviceName] = useState('Presence Phone');
+  const [deviceName, setDeviceName] = useState('Kasse CoP Phone');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [tokenSet, setTokenSet] = useState(false);
   const [deviceId, setDeviceId] = useState('');
+  const [branches, setBranches] = useState<BranchOption[]>([]);
+
+  const refreshBranches = React.useCallback(async (preferred?: string) => {
+    const s = await loadSettings();
+    if (!s.token) return;
+    try {
+      const res = await listBranches();
+      if (res.success && res.data?.branches) {
+        const list = res.data.branches as BranchOption[];
+        setBranches(list);
+        setBranchCode((current) => {
+          const next = preferred || current;
+          if (next && list.some((b) => b.code === next)) return next;
+          return list.length === 1 ? list[0].code : next;
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   React.useEffect(() => {
     loadSettings().then((s) => {
@@ -37,8 +59,9 @@ export default function SettingsScreen({ navigation }: Props) {
       setDeviceName(s.deviceName);
       setTokenSet(!!s.token);
       setDeviceId(s.deviceId);
+      if (s.token) refreshBranches(s.branchCode);
     });
-  }, []);
+  }, [refreshBranches]);
 
   async function onSave() {
     await saveSettings({
@@ -59,6 +82,7 @@ export default function SettingsScreen({ navigation }: Props) {
         await saveSettings({ token: res.data.token });
         setTokenSet(true);
         setMessage(`Logged in as ${res.data.user.fullName}`);
+        await refreshBranches();
       } else {
         setMessage(res.message || 'Login failed');
       }
@@ -70,12 +94,25 @@ export default function SettingsScreen({ navigation }: Props) {
   }
 
   async function onRegisterDevice() {
+    const code = branchCode.trim().toUpperCase();
+    if (!code) {
+      setMessage('Select or enter a branch code first');
+      Alert.alert(
+        'Branch required',
+        'Pick a branch below. If none exist, create one in Register Member first.',
+        [
+          { text: 'OK' },
+          { text: 'Create branch', onPress: () => navigation.navigate('RegisterMember') },
+        ],
+      );
+      return;
+    }
     setBusy(true);
     setMessage('Registering device…');
     try {
       await saveSettings({
         apiUrl: apiUrl.trim(),
-        branchCode: branchCode.trim().toUpperCase(),
+        branchCode: code,
         deviceName: deviceName.trim(),
       });
       const s = await loadSettings();
@@ -110,7 +147,7 @@ export default function SettingsScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen padding={0}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -124,10 +161,45 @@ export default function SettingsScreen({ navigation }: Props) {
         <Field
           label="Branch code"
           value={branchCode}
-          onChangeText={setBranchCode}
-          placeholder="e.g. HQ01 (assigned on registration)"
+          onChangeText={(t) => setBranchCode(t.toUpperCase())}
+          placeholder="e.g. HQ01"
           autoCapitalize="characters"
         />
+
+        {tokenSet ? (
+          <View style={styles.branchBox}>
+            <View style={styles.branchHeader}>
+              <Text style={styles.label}>Your branches</Text>
+              <Pressable onPress={() => refreshBranches()}>
+                <Text style={styles.refresh}>Refresh</Text>
+              </Pressable>
+            </View>
+            {branches.length === 0 ? (
+              <Pressable onPress={() => navigation.navigate('RegisterMember')}>
+                <Text style={styles.branchEmpty}>
+                  No branches yet. Tap to create one in Register Member.
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={styles.branchList}>
+                {branches.map((b) => (
+                  <Pressable
+                    key={b.code}
+                    style={[styles.chip, branchCode === b.code && styles.chipActive]}
+                    onPress={() => setBranchCode(b.code)}
+                  >
+                    <Text style={[styles.chipText, branchCode === b.code && styles.chipTextActive]}>
+                      {b.code} · {b.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : (
+          <Text style={styles.hint}>Login below to load and pick your branch.</Text>
+        )}
+
         <Field label="Device name" value={deviceName} onChangeText={setDeviceName} />
         <Field label="Admin email" value={email} onChangeText={setEmail} autoCapitalize="none" />
         <Field
@@ -151,7 +223,7 @@ export default function SettingsScreen({ navigation }: Props) {
         <Text style={styles.meta}>Token: {tokenSet ? 'saved' : 'not set'}</Text>
         <Text style={styles.meta}>Device ID: {deviceId || '—'}</Text>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -168,9 +240,8 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  container: { padding: 16, paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
   title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },
@@ -195,4 +266,27 @@ const styles = StyleSheet.create({
   btnText: { color: colors.white, fontWeight: '700', fontSize: 16 },
   message: { marginTop: 14, color: colors.teal, fontWeight: '600' },
   meta: { marginTop: 8, color: colors.textMuted },
+  branchBox: { marginBottom: 12 },
+  branchHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  refresh: { color: colors.teal, fontWeight: '700', marginBottom: 6 },
+  branchEmpty: {
+    color: colors.textMuted,
+    backgroundColor: colors.panel,
+    borderRadius: 12,
+    padding: 12,
+    overflow: 'hidden',
+  },
+  branchList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.panel,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipActive: { backgroundColor: colors.tileClock, borderColor: colors.accent },
+  chipText: { color: colors.textMuted, fontWeight: '600', fontSize: 13 },
+  chipTextActive: { color: colors.white },
+  hint: { color: colors.textMuted, marginBottom: 12, fontSize: 13 },
 });

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors, DEFAULT_API_URL } from '../theme';
 import { loadSettings } from '../api';
 import { RootStackParamList } from '../navigation';
+import Screen from '../components/Screen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Status'>;
 
@@ -31,7 +32,7 @@ export default function StatusScreen({ navigation }: Props) {
   }, []);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.text} />
@@ -49,13 +50,12 @@ export default function StatusScreen({ navigation }: Props) {
           <Text style={styles.value}>{health}</Text>
         )}
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg, padding: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
   title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },

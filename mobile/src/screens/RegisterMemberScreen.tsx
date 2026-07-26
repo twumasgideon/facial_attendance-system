@@ -5,7 +5,6 @@ import {
   Image,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +19,7 @@ import { colors } from '../theme';
 import { createBranch, listBranches, loadSettings, registerMember } from '../api';
 import { RootStackParamList } from '../navigation';
 import FaceCaptureModal from '../components/FaceCaptureModal';
+import Screen from '../components/Screen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RegisterMember'>;
 
@@ -198,7 +198,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen padding={0}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -273,7 +273,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           <View style={styles.newBranchBox}>
             <Field label="Branch code" value={newBranchCode} onChangeText={setNewBranchCode} autoCapitalize="characters" placeholder="BR02" />
             <Field label="Branch name" value={newBranchName} onChangeText={setNewBranchName} placeholder="Main Branch" />
-            <Field label="Organization name" value={newOrgName} onChangeText={setNewOrgName} placeholder="Your Organization" />
+            <Field label="Organization name" value={newOrgName} onChangeText={setNewOrgName} placeholder="Kasse Church of Pentecost" />
             <Pressable style={[styles.submit, styles.secondary]} onPress={onCreateBranch} disabled={busy}>
               <Text style={[styles.submitText, { color: colors.teal }]}>Save branch</Text>
             </Pressable>
@@ -288,7 +288,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           <Text style={styles.hint}>On web, use Gallery if camera is unavailable in the browser.</Text>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -305,9 +305,8 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  container: { padding: 16, paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  container: { paddingHorizontal: 16, paddingBottom: 40 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 20 },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
   title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },

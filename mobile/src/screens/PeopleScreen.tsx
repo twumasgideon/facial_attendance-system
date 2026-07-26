@@ -4,7 +4,6 @@ import {
   FlatList,
   Image,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { listEmployees } from '../api';
 import { RootStackParamList } from '../navigation';
+import Screen from '../components/Screen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'People'>;
 
@@ -55,7 +55,7 @@ export default function PeopleScreen({ navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <Screen>
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.text} />
@@ -121,13 +121,12 @@ export default function PeopleScreen({ navigation }: Props) {
           }
         />
       )}
-    </SafeAreaView>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg, padding: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
   title: { marginLeft: 8, flex: 1, fontSize: 20, fontWeight: '800', color: colors.text },
