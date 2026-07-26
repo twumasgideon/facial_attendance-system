@@ -120,7 +120,7 @@ export default function HomeScreen({ navigation }: Props) {
     {
       key: 'people',
       title: 'View People',
-      subtitle: `${faceCount} synced faces`,
+      subtitle: `${faceCount} church members`,
       color: colors.tilePeople,
       icon: <Ionicons name="people" size={36} color={colors.white} />,
       onPress: () => navigation.navigate('People'),
@@ -128,7 +128,7 @@ export default function HomeScreen({ navigation }: Props) {
     {
       key: 'sync',
       title: 'Sync Faces',
-      subtitle: 'Today present / late',
+      subtitle: 'Present / absent today',
       color: colors.tileSync,
       icon: <Ionicons name="sync" size={36} color={colors.accent} />,
       onPress: () => navigation.navigate('Sync'),

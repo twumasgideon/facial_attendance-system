@@ -72,7 +72,11 @@ export default function RegisterMemberScreen({ navigation }: Props) {
 
   async function onSubmit() {
     if (!employeeId.trim() || !fullName.trim()) {
-      Alert.alert('Missing fields', 'Employee ID and full name are required.');
+      Alert.alert('Missing fields', 'Church Member ID and full name are required.');
+      return;
+    }
+    if (!phone.trim()) {
+      Alert.alert('Phone required', 'Add the member’s registered phone number.');
       return;
     }
     if (!photoBase64) {
@@ -98,7 +102,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
         const savedId = employeeId.trim().toUpperCase();
         Alert.alert(
           'Member registered',
-          `${name} can now clock in / out using Employee ID ${savedId}.`,
+          `${name} can now clock in / out using Church Member ID ${savedId}.`,
           [
             {
               text: 'Register another',
@@ -156,7 +160,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           <Text style={styles.photoCaption}>
             {photoUri
               ? 'Face registered — used for clock-in / clock-out'
-              : 'Capture the member’s face to enable clock-in with their Employee ID'}
+              : 'Capture the member’s face to enable clock-in with their Church Member ID'}
           </Text>
           <View style={styles.photoActions}>
             <Pressable style={styles.photoBtn} onPress={() => setShowFaceCam(true)}>
@@ -178,13 +182,20 @@ export default function RegisterMemberScreen({ navigation }: Props) {
         />
 
         <Field
-          label="Employee ID *"
+          label="Church Member ID *"
           value={employeeId}
           onChangeText={setEmployeeId}
           autoCapitalize="characters"
-          placeholder="EMP004"
+          placeholder="CM001"
         />
         <Field label="Full name *" value={fullName} onChangeText={setFullName} placeholder="Jane Doe" />
+        <Field
+          label="Phone *"
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          placeholder="024xxxxxxx"
+        />
         <Field
           label="Email"
           value={email}
@@ -193,7 +204,6 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           keyboardType="email-address"
           placeholder="optional"
         />
-        <Field label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
         <Field label="Position" value={position} onChangeText={setPosition} placeholder="Member" />
         <Field label="Department" value={departmentName} onChangeText={setDepartmentName} />
 

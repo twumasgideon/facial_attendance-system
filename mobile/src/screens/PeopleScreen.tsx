@@ -26,6 +26,7 @@ type Person = {
   faceStatus?: string;
   employmentStatus?: string;
   photoUrl?: string;
+  phone?: string;
 };
 
 export default function PeopleScreen({ navigation }: Props) {
@@ -61,7 +62,7 @@ export default function PeopleScreen({ navigation }: Props) {
           <Ionicons name="chevron-back" size={22} color={colors.text} />
           <Text style={styles.back}>Back</Text>
         </Pressable>
-        <Text style={styles.title}>View People</Text>
+        <Text style={styles.title}>Church Members</Text>
         <Pressable style={styles.addBtn} onPress={() => navigation.navigate('RegisterMember')}>
           <Ionicons name="person-add" size={18} color={colors.white} />
           <Text style={styles.addText}>Add</Text>
@@ -103,8 +104,9 @@ export default function PeopleScreen({ navigation }: Props) {
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.fullName}</Text>
                 <Text style={styles.meta}>
-                  {item.employeeId} · {item.position || 'Staff'}
+                  {item.employeeId} · {item.position || 'Member'}
                 </Text>
+                {!!item.phone && <Text style={styles.meta}>Phone: {item.phone}</Text>}
                 <Text style={styles.meta}>
                   Face: {item.faceStatus || '—'} · {item.employmentStatus || '—'}
                 </Text>

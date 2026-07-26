@@ -196,15 +196,23 @@ export async function todayAttendance() {
   return request<{
     dateKey: string;
     timezone: string;
+    serviceEnded?: boolean;
     schedule: {
       serviceStart: string;
       lateAfter: string;
       serviceEnd: string;
       assembly: string;
     };
-    summary: { present: number; late: number; total: number };
+    summary: {
+      present: number;
+      late: number;
+      absent: number;
+      totalRegistered: number;
+      attended: number;
+    };
     present: Array<Record<string, unknown>>;
     late: Array<Record<string, unknown>>;
+    absent: Array<Record<string, unknown>>;
   }>('/attendance/today');
 }
 

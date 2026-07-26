@@ -26,7 +26,7 @@ export default function ClockScreen({ navigation }: Props) {
   const cameraRef = useRef<CameraView>(null);
   const [employeeId, setEmployeeId] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Enter Employee ID and position your face');
+  const [status, setStatus] = useState('Enter Church Member ID and position your face');
   const [welcomeName, setWelcomeName] = useState('');
   const [welcomeBody, setWelcomeBody] = useState('');
   const [stampTime, setStampTime] = useState('');
@@ -53,7 +53,7 @@ export default function ClockScreen({ navigation }: Props) {
 
   async function submit(type: 'CLOCK_IN' | 'CLOCK_OUT') {
     if (!employeeId.trim()) {
-      setStatus('Enter the Employee ID first');
+      setStatus('Enter the Church Member ID first');
       return;
     }
 
@@ -164,7 +164,7 @@ export default function ClockScreen({ navigation }: Props) {
         value={employeeId}
         onChangeText={setEmployeeId}
         autoCapitalize="characters"
-        placeholder="Employee ID"
+        placeholder="Church Member ID"
         placeholderTextColor={colors.textMuted}
         editable={!busy && !showSuccess}
       />

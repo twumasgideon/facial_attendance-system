@@ -268,15 +268,34 @@ async function listAttendance(req, res) {
 
 async function todayAttendance(_req, res) {
   await runAutoClockOut(new Date());
+  const report = await buildServiceReport(new Date());
+  return ok(res, report);
+}
 
-  const { start, end, dateKey } = ghanaDayBounds(new Date());
-  const clockIns = await Attendance.find({
-    attendanceType: 'CLOCK_IN',
-    timestamp: { $gte: start, $lte: end },
-  })
-    .sort({ timestamp: 1 })
-    .populate('branch', 'code name');
+/**
+ * Present / late / absent for today's service, with registered phone numbers.
+ * Absent = active registered church members who did not clock in.
+ */
+async function buildServiceReport(now = new Date()) {
+  const { start, end, dateKey } = ghanaDayBounds(now);
+  const serviceEnded = isPastAutoClockOut(now);
 
+  const [clockIns, members] = await Promise.all([
+    Attendance.find({
+      attendanceType: 'CLOCK_IN',
+      timestamp: { $gte: start, $lte: end },
+    })
+      .sort({ timestamp: 1 })
+      .populate('branch', 'code name'),
+    User.find({
+      employmentStatus: 'ACTIVE',
+      role: { $in: ['EMPLOYEE', 'SUPERVISOR'] },
+    })
+      .select('employeeId fullName phone faceStatus employmentStatus position')
+      .sort({ fullName: 1 }),
+  ]);
+
+  const phoneById = new Map(members.map((m) => [m.employeeId, m.phone || '']));
   const present = [];
   const late = [];
   const seen = new Set();
@@ -286,19 +305,32 @@ async function todayAttendance(_req, res) {
     seen.add(record.employeeId);
     const row = {
       ...serializeAttendance(record),
+      memberId: record.employeeId,
+      phone: phoneById.get(record.employeeId) || '',
       clockOut: null,
     };
-    const out = await findTodaysClockOut(record.employeeId);
-    if (out) {
-      row.clockOut = serializeAttendance(out);
-    }
+    const out = await findTodaysClockOut(record.employeeId, now);
+    if (out) row.clockOut = serializeAttendance(out);
     if (record.status === 'LATE') late.push(row);
     else present.push(row);
   }
 
-  return ok(res, {
+  const absent = members
+    .filter((m) => !seen.has(m.employeeId))
+    .map((m) => ({
+      memberId: m.employeeId,
+      employeeId: m.employeeId,
+      fullName: m.fullName,
+      phone: m.phone || '',
+      faceStatus: m.faceStatus,
+      position: m.position || 'Member',
+      status: 'ABSENT',
+    }));
+
+  return {
     dateKey,
     timezone: 'Africa/Accra',
+    serviceEnded,
     schedule: {
       serviceStart: '07:30 AM',
       lateAfter: '09:30 AM',
@@ -308,11 +340,14 @@ async function todayAttendance(_req, res) {
     summary: {
       present: present.length,
       late: late.length,
-      total: present.length + late.length,
+      absent: absent.length,
+      totalRegistered: members.length,
+      attended: present.length + late.length,
     },
     present,
     late,
-  });
+    absent,
+  };
 }
 
 async function autoClockOut(req, res) {
@@ -328,10 +363,12 @@ async function autoClockOut(req, res) {
   }
 
   const result = await runAutoClockOut(new Date());
+  const report = await buildServiceReport(new Date());
   return ok(res, {
     ...result,
+    report,
     message: result.ran
-      ? `Auto clock-out complete: ${result.clockedOut} member(s)`
+      ? `Service closed. Auto clock-out: ${result.clockedOut}. Present: ${report.summary.attended}, Absent: ${report.summary.absent}`
       : 'Auto clock-out not due yet (before 2:00 PM Ghana time)',
   });
 }
@@ -344,4 +381,5 @@ module.exports = {
   todayAttendance,
   autoClockOut,
   runAutoClockOut,
+  buildServiceReport,
 };

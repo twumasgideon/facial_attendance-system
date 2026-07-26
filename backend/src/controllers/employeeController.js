@@ -143,7 +143,12 @@ async function createEmployee(req, res) {
   const id = employeeId.toUpperCase().trim();
   const existing = await User.findOne({ employeeId: id });
   if (existing) {
-    return fail(res, 'Employee ID already exists', 409);
+    return fail(res, 'Church Member ID already exists', 409);
+  }
+
+  const phoneTrimmed = String(phone || '').trim();
+  if (!phoneTrimmed) {
+    return fail(res, 'Registered phone number is required', 400);
   }
 
   let branch = null;
@@ -169,7 +174,7 @@ async function createEmployee(req, res) {
     fullName: fullName.trim(),
     email: safeEmail,
     passwordHash: await hashPassword('Employee123!'),
-    phone: String(phone || '').trim(),
+    phone: phoneTrimmed,
     role,
     department: dept._id,
     branch: branch._id,
