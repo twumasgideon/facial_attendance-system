@@ -97,12 +97,9 @@ export default function RegisterMemberScreen({ navigation }: Props) {
       });
       if (res.success) {
         const name = (res.data?.user?.fullName as string) || fullName;
-        const savedId = String(
-          res.data?.memberId || res.data?.user?.employeeId || '',
-        ).toUpperCase();
         Alert.alert(
           'Member registered',
-          `${name}\nChurch Member ID: ${savedId}\n\nUse this ID to clock in / out.`,
+          `${name} is ready.\n\nThey clock in and out with their face — no Member ID to type.`,
           [
             {
               text: 'Register another',
@@ -122,7 +119,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
             },
           ],
         );
-        setMessage(`Registered ${name} · ID ${savedId}`);
+        setMessage(`Registered ${name} — face ready for clock-in`);
       } else {
         setMessage(res.message || 'Registration failed');
         Alert.alert('Failed', res.message || 'Could not register member');
@@ -158,8 +155,8 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           )}
           <Text style={styles.photoCaption}>
             {photoUri
-              ? 'Face registered — used for clock-in / clock-out'
-              : 'Capture the member’s face. A Church Member ID will be generated automatically.'}
+              ? 'Face saved — used to identify this member at clock-in'
+              : 'Capture a clear face photo. This is how the member will be recognized.'}
           </Text>
           <View style={styles.photoActions}>
             <Pressable style={styles.photoBtn} onPress={() => setShowFaceCam(true)}>
@@ -180,7 +177,9 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           onCapture={onFaceCaptured}
         />
 
-        <Text style={styles.autoIdNote}>Church Member ID is generated automatically (e.g. CM001).</Text>
+        <Text style={styles.autoIdNote}>
+          No Member ID to enter — facial recognition identifies members on phone and desktop.
+        </Text>
 
         <Field label="Full name *" value={fullName} onChangeText={setFullName} placeholder="Jane Doe" />
         <Field

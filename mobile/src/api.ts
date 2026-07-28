@@ -225,7 +225,7 @@ export async function syncFaces() {
 }
 
 export async function createAttendance(payload: {
-  employeeId: string;
+  employeeId?: string;
   deviceId: string;
   attendanceType: 'CLOCK_IN' | 'CLOCK_OUT';
   timestamp: string;
@@ -242,6 +242,8 @@ export async function createAttendance(payload: {
       photoUrl?: string;
       faceStatus?: string;
     };
+    recognizedByFace?: boolean;
+    matchConfidence?: number | null;
     welcome?: {
       title: string;
       body: string;

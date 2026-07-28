@@ -6,6 +6,7 @@ const { hashPassword } = require('../utils/auth');
 const { ok, fail } = require('../utils/response');
 const { validate } = require('../middleware/validate');
 const { ensureDefaultBranch } = require('../utils/ensureDefaults');
+const { embeddingFromPhoto } = require('../utils/faceMatch');
 
 const ADMIN_ROLES = ['SUPER_ADMIN', 'HR_ADMIN', 'BRANCH_MANAGER'];
 
@@ -15,18 +16,6 @@ function normalizePhoto(photoBase64) {
   if (!trimmed) return '';
   if (trimmed.startsWith('data:image/')) return trimmed;
   return `data:image/jpeg;base64,${trimmed}`;
-}
-
-/** Lightweight placeholder embedding until on-device FaceNet lands in P1. */
-function placeholderEmbedding(seed) {
-  const out = [];
-  let h = 0;
-  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  for (let i = 0; i < 32; i += 1) {
-    h = (h * 1664525 + 1013904223) >>> 0;
-    out.push((h % 1000) / 1000);
-  }
-  return out;
 }
 
 async function resolveDepartment(branchId, departmentCode, departmentName) {
@@ -122,11 +111,11 @@ const createValidators = [
   body('position').optional().isString(),
   body('departmentCode').optional().isString(),
   body('departmentName').optional().isString(),
-  body('photoBase64').optional().isString(),
+  body('photoBase64').isString().trim().notEmpty(),
   body('role').optional().isIn(['EMPLOYEE', 'SUPERVISOR', 'BRANCH_MANAGER', 'HR_ADMIN']),
 ];
 
-/** Next Church Member ID like CM001, CM002… */
+/** Internal record ID (CM001…) — members clock in by face, not by typing this. */
 async function nextChurchMemberId() {
   const users = await User.find({ employeeId: /^CM\d+$/i })
     .select('employeeId')
@@ -170,6 +159,16 @@ async function createEmployee(req, res) {
     return fail(res, 'Registered phone number is required', 400);
   }
 
+  const photoUrl = normalizePhoto(photoBase64);
+  if (!photoUrl) {
+    return fail(res, 'Face photo is required for registration', 400);
+  }
+
+  const faceEmbedding = embeddingFromPhoto(photoUrl);
+  if (!faceEmbedding.length) {
+    return fail(res, 'Could not process face photo. Try again with a clearer face shot.', 400);
+  }
+
   let branch = null;
   if (branchCode) {
     branch = await Branch.findOne({ code: String(branchCode).toUpperCase(), isActive: true });
@@ -185,8 +184,6 @@ async function createEmployee(req, res) {
   }
 
   const dept = await resolveDepartment(branch._id, departmentCode, departmentName);
-  const photoUrl = normalizePhoto(photoBase64);
-  const hasFace = !!photoUrl;
 
   const user = await User.create({
     employeeId: id,
@@ -197,10 +194,10 @@ async function createEmployee(req, res) {
     role,
     department: dept._id,
     branch: branch._id,
-    position: String(position || '').trim(),
+    position: String(position || '').trim() || 'Member',
     photoUrl,
-    faceStatus: hasFace ? 'REGISTERED' : 'PENDING',
-    faceEmbedding: hasFace ? placeholderEmbedding(`${id}:${photoUrl.slice(0, 64)}`) : undefined,
+    faceStatus: 'REGISTERED',
+    faceEmbedding,
     employmentStatus: 'ACTIVE',
     registeredAt: new Date(),
   });
@@ -208,7 +205,7 @@ async function createEmployee(req, res) {
   await user.populate('department', 'code name');
   await user.populate('branch', 'code name organizationName');
 
-  return ok(res, { user: user.toSafeJSON(), memberId: id }, 201);
+  return ok(res, { user: user.toSafeJSON(), memberId: user.employeeId }, 201);
 }
 
 const updateValidators = [
@@ -256,9 +253,16 @@ async function updateEmployee(req, res) {
 
   if (req.body.photoBase64) {
     const photoUrl = normalizePhoto(req.body.photoBase64);
+    if (!photoUrl) {
+      return fail(res, 'Invalid face photo', 400);
+    }
+    const faceEmbedding = embeddingFromPhoto(photoUrl);
+    if (!faceEmbedding.length) {
+      return fail(res, 'Could not process face photo', 400);
+    }
     user.photoUrl = photoUrl;
     user.faceStatus = 'REGISTERED';
-    user.faceEmbedding = placeholderEmbedding(`${user.employeeId}:${photoUrl.slice(0, 64)}`);
+    user.faceEmbedding = faceEmbedding;
   } else if (req.body.faceStatus) {
     user.faceStatus = req.body.faceStatus;
   }

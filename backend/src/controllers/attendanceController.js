@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { ok, fail } = require('../utils/response');
 const { validate } = require('../middleware/validate');
 const { ensureDevice } = require('../utils/ensureDefaults');
+const { embeddingFromPhoto, findBestFaceMatch } = require('../utils/faceMatch');
 const {
   SCHEDULE,
   ghanaDayBounds,
@@ -109,7 +110,7 @@ async function runAutoClockOut(now = new Date()) {
 }
 
 const createValidators = [
-  body('employeeId').isString().trim().notEmpty(),
+  body('employeeId').optional({ nullable: true }).isString().trim(),
   body('deviceId').optional().isString().trim(),
   body('attendanceType').isIn(['CLOCK_IN', 'CLOCK_OUT', 'BREAK_START', 'BREAK_END']),
   body('timestamp').isISO8601(),
@@ -118,6 +119,67 @@ const createValidators = [
   body('clientEventId').optional().isString(),
   body('faceImageBase64').optional().isString(),
 ];
+
+/**
+ * Resolve member by typed ID (legacy) or by matching live face to registered faces.
+ */
+async function resolveAttendanceUser(employeeId, faceImageBase64) {
+  const id = String(employeeId || '')
+    .toUpperCase()
+    .trim();
+  const photo = normalizePhoto(faceImageBase64);
+
+  if (id) {
+    const user = await User.findOne({ employeeId: id }).populate('department');
+    if (!user) return { error: ['Member not found', 404] };
+    if (user.faceStatus !== 'REGISTERED') {
+      return { error: ['Face not registered for this member. Register their face first.', 400] };
+    }
+    return { user, matchConfidence: null };
+  }
+
+  if (!photo) {
+    return { error: ['Face capture is required to identify the member', 400] };
+  }
+
+  const probe = embeddingFromPhoto(photo);
+  if (!probe.length) {
+    return { error: ['Could not read face photo. Try again with better lighting.', 400] };
+  }
+
+  const registered = await User.find({
+    employmentStatus: 'ACTIVE',
+    faceStatus: 'REGISTERED',
+  })
+    .select('+faceEmbedding')
+    .populate('department');
+
+  const candidates = [];
+  for (const u of registered) {
+    let emb = u.faceEmbedding;
+    // Rebuild embedding from stored photo if missing / old placeholder length.
+    if ((!emb || emb.length < 64) && u.photoUrl) {
+      emb = embeddingFromPhoto(u.photoUrl);
+      if (emb.length) {
+        u.faceEmbedding = emb;
+        await u.save();
+      }
+    }
+    if (emb?.length) candidates.push({ user: u, embedding: emb });
+  }
+
+  const match = findBestFaceMatch(probe, candidates);
+  if (!match) {
+    return {
+      error: [
+        'Face not recognized. Register this member first, or retake with face clearly in the frame.',
+        404,
+      ],
+    };
+  }
+
+  return { user: match.user, matchConfidence: match.confidence };
+}
 
 async function createAttendance(req, res) {
   const {
@@ -144,14 +206,11 @@ async function createAttendance(req, res) {
     }
   }
 
-  const user = await User.findOne({ employeeId: employeeId.toUpperCase() }).populate('department');
-  if (!user) {
-    return fail(res, 'Employee not found', 404);
+  const resolved = await resolveAttendanceUser(employeeId, faceImageBase64);
+  if (resolved.error) {
+    return fail(res, resolved.error[0], resolved.error[1]);
   }
-
-  if (user.faceStatus !== 'REGISTERED') {
-    return fail(res, 'Face not registered for this employee. Register their face first.', 400);
-  }
+  const { user, matchConfidence } = resolved;
 
   // Auto-create/authorize device — no manual Register Device step.
   const { device, branch } = await ensureDevice({
@@ -204,7 +263,13 @@ async function createAttendance(req, res) {
 
   const capturedSnapshot = normalizePhoto(faceImageBase64) || imageSnapshotUrl || '';
   const resolvedFaceScore =
-    typeof faceScore === 'number' ? faceScore : capturedSnapshot ? 96 : undefined;
+    typeof faceScore === 'number'
+      ? faceScore
+      : typeof matchConfidence === 'number'
+        ? matchConfidence
+        : capturedSnapshot
+          ? 96
+          : undefined;
 
   const attendance = await Attendance.create({
     employee: user._id,
@@ -235,6 +300,8 @@ async function createAttendance(req, res) {
         photoUrl: user.photoUrl || '',
         faceStatus: user.faceStatus,
       },
+      recognizedByFace: !String(employeeId || '').trim(),
+      matchConfidence: matchConfidence ?? null,
       welcome,
       schedule: {
         timezone: 'Africa/Accra',

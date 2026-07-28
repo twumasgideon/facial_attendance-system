@@ -3,10 +3,10 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,9 +24,8 @@ export default function ClockScreen({ navigation }: Props) {
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
-  const [employeeId, setEmployeeId] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState('Enter Church Member ID and position your face');
+  const [status, setStatus] = useState('Position your face in the frame, then Clock In or Out');
   const [welcomeName, setWelcomeName] = useState('');
   const [welcomeBody, setWelcomeBody] = useState('');
   const [stampTime, setStampTime] = useState('');
@@ -52,23 +51,26 @@ export default function ClockScreen({ navigation }: Props) {
   }, [navigation]);
 
   async function submit(type: 'CLOCK_IN' | 'CLOCK_OUT') {
-    if (!employeeId.trim()) {
-      setStatus('Enter the Church Member ID first');
-      return;
-    }
-
-    // Capture the live face while the camera is still on (before busy stops it).
     let faceImageBase64 = '';
     setStatus('Scanning face...');
     try {
-      const pic = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.5 });
+      const pic = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.55 });
       faceImageBase64 = pic?.base64 || '';
     } catch {
-      // proceed without image if capture is unavailable (e.g. web)
+      // capture may fail on some browsers
+    }
+
+    if (!faceImageBase64) {
+      setStatus(
+        Platform.OS === 'web'
+          ? 'Could not capture face. Allow camera access and try again.'
+          : 'Could not capture face. Check camera permission and try again.',
+      );
+      return;
     }
 
     setBusy(true);
-    setStatus('Recording attendance...');
+    setStatus('Recognizing face...');
     try {
       const settings = await loadSettings();
       if (!settings.token) {
@@ -76,15 +78,17 @@ export default function ClockScreen({ navigation }: Props) {
         return;
       }
       const res = await createAttendance({
-        employeeId: employeeId.trim().toUpperCase(),
         deviceId: settings.deviceId || 'KASSE-PHONE',
         attendanceType: type,
         timestamp: new Date().toISOString(),
-        faceImageBase64: faceImageBase64 || undefined,
+        faceImageBase64,
         clientEventId: `mob-${Date.now()}`,
       });
       if (res.success) {
-        const name = (res.data?.attendance?.fullName as string) || employeeId;
+        const name =
+          (res.data?.attendance?.fullName as string) ||
+          (res.data?.employee?.fullName as string) ||
+          'Member';
         const attStatus = String(res.data?.attendance?.status || '');
         const stamped =
           String(res.data?.attendance?.stampedAt || '') ||
@@ -104,9 +108,9 @@ export default function ClockScreen({ navigation }: Props) {
         setStatus(
           type === 'CLOCK_IN'
             ? attStatus === 'LATE'
-              ? 'Clocked in — LATE'
-              : 'Clocked in — On time'
-            : 'Clocked out',
+              ? `Recognized ${name} — LATE`
+              : `Recognized ${name} — On time`
+            : `Recognized ${name} — Clocked out`,
         );
       } else {
         setStatus(res.message || 'Attendance failed');
@@ -159,15 +163,7 @@ export default function ClockScreen({ navigation }: Props) {
       </View>
 
       <Text style={styles.status}>{status}</Text>
-      <TextInput
-        style={styles.input}
-        value={employeeId}
-        onChangeText={setEmployeeId}
-        autoCapitalize="characters"
-        placeholder="Church Member ID"
-        placeholderTextColor={colors.textMuted}
-        editable={!busy && !showSuccess}
-      />
+      <Text style={styles.hint}>No Member ID needed — your face identifies you.</Text>
 
       <View style={styles.row}>
         <Pressable
@@ -236,9 +232,9 @@ const styles = StyleSheet.create({
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
   title: { marginLeft: 8, fontSize: 20, fontWeight: '800', color: colors.text },
   cameraWrap: {
-    height: 200,
+    height: 280,
     width: '100%',
-    maxWidth: 280,
+    maxWidth: 360,
     alignSelf: 'center',
     borderRadius: 20,
     overflow: 'hidden',
@@ -255,24 +251,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   frame: {
-    width: 140,
-    height: 160,
+    width: 160,
+    height: 190,
     borderRadius: 18,
     borderWidth: 2,
     borderColor: 'rgba(20,184,166,0.85)',
   },
   cameraFallback: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   fallbackText: { color: colors.textMuted },
-  status: { marginTop: 14, fontSize: 15, fontWeight: '600', color: colors.text },
-  input: {
-    marginTop: 10,
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: colors.text,
+  status: { marginTop: 14, fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'center' },
+  hint: {
+    marginTop: 6,
+    marginBottom: 4,
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   row: { flexDirection: 'row', gap: 10, marginTop: 14 },
   flex: { flex: 1 },
