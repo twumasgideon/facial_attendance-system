@@ -194,11 +194,13 @@ export async function listAttendance() {
   return request<{ records: Array<Record<string, unknown>> }>('/attendance?limit=30');
 }
 
-export async function todayAttendance() {
+export async function todayAttendance(dateKey?: string) {
+  const q = dateKey ? `?date=${encodeURIComponent(dateKey)}` : '';
   return request<{
     dateKey: string;
     timezone: string;
     serviceEnded?: boolean;
+    live?: boolean;
     schedule: {
       serviceStart: string;
       lateAfter: string;
@@ -215,7 +217,41 @@ export async function todayAttendance() {
     present: Array<Record<string, unknown>>;
     late: Array<Record<string, unknown>>;
     absent: Array<Record<string, unknown>>;
-  }>('/attendance/today');
+  }>(`/attendance/today${q}`);
+}
+
+export async function listSessions() {
+  return request<{
+    timezone: string;
+    count: number;
+    sessions: Array<{
+      dateKey: string;
+      onTime: number;
+      late: number;
+      attended: number;
+      absent: number;
+      totalRegistered: number;
+    }>;
+  }>('/attendance/sessions?limit=60');
+}
+
+export async function attendanceAnalytics(from?: string, to?: string) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const q = params.toString() ? `?${params.toString()}` : '';
+  return request<{
+    timezone: string;
+    range: { from: string; to: string };
+    servicesCounted: number;
+    serviceDates: string[];
+    totals: { onTime: number; late: number; absent: number; total: number };
+    pie: Array<{ key: string; label: string; value: number; percent: number; color: string }>;
+    members: Array<Record<string, unknown>>;
+    mostPunctual: Array<Record<string, unknown>>;
+    oftenLate: Array<Record<string, unknown>>;
+    oftenAbsent: Array<Record<string, unknown>>;
+  }>(`/attendance/analytics${q}`);
 }
 
 export async function syncFaces() {

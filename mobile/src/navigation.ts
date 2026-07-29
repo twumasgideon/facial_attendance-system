@@ -5,5 +5,6 @@ export type RootStackParamList = {
   RegisterMember: undefined;
   Settings: undefined;
   Sync: undefined;
+  Analytics: undefined;
   Status: undefined;
 };

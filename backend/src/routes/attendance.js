@@ -19,6 +19,20 @@ router.get(
   attendanceController.todayAttendance
 );
 
+router.get(
+  '/sessions',
+  authenticate,
+  authorize('SUPER_ADMIN', 'HR_ADMIN', 'BRANCH_MANAGER', 'SUPERVISOR', 'AUDITOR', 'EMPLOYEE'),
+  attendanceController.listSessions
+);
+
+router.get(
+  '/analytics',
+  authenticate,
+  authorize('SUPER_ADMIN', 'HR_ADMIN', 'BRANCH_MANAGER', 'SUPERVISOR', 'AUDITOR', 'EMPLOYEE'),
+  attendanceController.attendanceAnalytics
+);
+
 router.post('/auto-clock-out', optionalAuthenticate, attendanceController.autoClockOut);
 router.get('/auto-clock-out', optionalAuthenticate, attendanceController.autoClockOut);
 

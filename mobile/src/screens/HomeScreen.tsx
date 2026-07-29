@@ -128,10 +128,18 @@ export default function HomeScreen({ navigation }: Props) {
     {
       key: 'sync',
       title: 'Session Report',
-      subtitle: 'Present · absent · print',
+      subtitle: 'Live · history · print',
       color: colors.tileSync,
       icon: <Ionicons name="print" size={36} color={colors.accent} />,
       onPress: () => navigation.navigate('Sync'),
+    },
+    {
+      key: 'analytics',
+      title: 'Punctuality',
+      subtitle: 'Pie chart analysis',
+      color: colors.tilePeople,
+      icon: <Ionicons name="pie-chart" size={36} color={colors.white} />,
+      onPress: () => navigation.navigate('Analytics'),
     },
     {
       key: 'settings',

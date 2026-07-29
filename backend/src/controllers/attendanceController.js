@@ -15,6 +15,7 @@ const {
   isPastAutoClockOut,
   welcomeFor,
   ghanaDateKey,
+  parseGhanaDateKey,
 } = require('../utils/churchSchedule');
 
 function normalizePhoto(photoBase64) {
@@ -333,19 +334,27 @@ async function listAttendance(req, res) {
   return ok(res, { records: records.map(serializeAttendance) });
 }
 
-async function todayAttendance(_req, res) {
+async function todayAttendance(req, res) {
   await runAutoClockOut(new Date());
-  const report = await buildServiceReport(new Date());
+  const dateParam = req.query.date;
+  let forDate = new Date();
+  if (dateParam) {
+    const parsed = parseGhanaDateKey(dateParam);
+    if (!parsed) return fail(res, 'Invalid date. Use YYYY-MM-DD', 400);
+    forDate = parsed;
+  }
+  const report = await buildServiceReport(forDate);
   return ok(res, report);
 }
 
 /**
- * Present / late / absent for today's service, with registered phone numbers.
- * Absent = active registered church members who did not clock in.
+ * Present / late / absent for a service day (Ghana), with phones + towns.
+ * Absent = active members registered on/before that day who did not clock in.
  */
-async function buildServiceReport(now = new Date()) {
-  const { start, end, dateKey } = ghanaDayBounds(now);
-  const serviceEnded = isPastAutoClockOut(now);
+async function buildServiceReport(forDate = new Date()) {
+  const { start, end, dateKey } = ghanaDayBounds(forDate);
+  const todayKey = ghanaDateKey(new Date());
+  const serviceEnded = dateKey < todayKey ? true : isPastAutoClockOut(forDate);
 
   const [clockIns, members] = await Promise.all([
     Attendance.find({
@@ -357,6 +366,7 @@ async function buildServiceReport(now = new Date()) {
     User.find({
       employmentStatus: 'ACTIVE',
       role: { $in: ['EMPLOYEE', 'SUPERVISOR'] },
+      registeredAt: { $lte: end },
     })
       .select('employeeId fullName phone town faceStatus employmentStatus position')
       .sort({ fullName: 1 }),
@@ -383,7 +393,7 @@ async function buildServiceReport(now = new Date()) {
       town: info.town,
       clockOut: null,
     };
-    const out = await findTodaysClockOut(record.employeeId, now);
+    const out = await findTodaysClockOut(record.employeeId, forDate);
     if (out) row.clockOut = serializeAttendance(out);
     if (record.status === 'LATE') late.push(row);
     else present.push(row);
@@ -406,6 +416,7 @@ async function buildServiceReport(now = new Date()) {
     dateKey,
     timezone: 'Africa/Accra',
     serviceEnded,
+    live: dateKey === todayKey,
     schedule: {
       serviceStart: '07:30 AM',
       lateAfter: '09:30 AM',
@@ -423,6 +434,206 @@ async function buildServiceReport(now = new Date()) {
     late,
     absent,
   };
+}
+
+/** List saved service days (from clock-ins) with rollup counts — newest first. */
+async function listSessions(req, res) {
+  await runAutoClockOut(new Date());
+  const limit = Math.min(Number(req.query.limit) || 60, 120);
+
+  const clockIns = await Attendance.find({ attendanceType: 'CLOCK_IN' })
+    .select('employeeId timestamp status')
+    .sort({ timestamp: -1 })
+    .lean();
+
+  const byDay = new Map();
+  for (const row of clockIns) {
+    const key = ghanaDateKey(row.timestamp);
+    if (!byDay.has(key)) {
+      byDay.set(key, { dateKey: key, onTime: 0, late: 0, attendedIds: new Set() });
+    }
+    const day = byDay.get(key);
+    if (day.attendedIds.has(row.employeeId)) continue;
+    day.attendedIds.add(row.employeeId);
+    if (row.status === 'LATE') day.late += 1;
+    else day.onTime += 1;
+  }
+
+  const sessions = [];
+  for (const [key, day] of byDay) {
+    const { end } = ghanaDayBounds(parseGhanaDateKey(key));
+    const registered = await User.countDocuments({
+      employmentStatus: 'ACTIVE',
+      role: { $in: ['EMPLOYEE', 'SUPERVISOR'] },
+      registeredAt: { $lte: end },
+    });
+    const attended = day.onTime + day.late;
+    sessions.push({
+      dateKey: key,
+      onTime: day.onTime,
+      late: day.late,
+      attended,
+      absent: Math.max(0, registered - attended),
+      totalRegistered: registered,
+    });
+    if (sessions.length >= limit) break;
+  }
+
+  // byDay is insertion-ordered from newest clock-ins; keep newest first
+  return ok(res, {
+    timezone: 'Africa/Accra',
+    count: sessions.length,
+    sessions,
+  });
+}
+
+/**
+ * Punctuality analysis across service dates — pie totals + per-member rates.
+ * Query: from=YYYY-MM-DD&to=YYYY-MM-DD (defaults: last 30 Ghana days with activity, or calendar 30 days).
+ */
+async function attendanceAnalytics(req, res) {
+  await runAutoClockOut(new Date());
+
+  const todayKey = ghanaDateKey(new Date());
+  let toKey = String(req.query.to || todayKey).trim();
+  let fromKey = String(req.query.from || '').trim();
+
+  if (!parseGhanaDateKey(toKey)) return fail(res, 'Invalid to date', 400);
+
+  if (!fromKey) {
+    const toDate = parseGhanaDateKey(toKey);
+    const fromDate = new Date(toDate);
+    fromDate.setUTCDate(fromDate.getUTCDate() - 60);
+    fromKey = ghanaDateKey(fromDate);
+  }
+  if (!parseGhanaDateKey(fromKey)) return fail(res, 'Invalid from date', 400);
+  if (fromKey > toKey) return fail(res, 'from must be on or before to', 400);
+
+  const fromBound = ghanaDayBounds(parseGhanaDateKey(fromKey)).start;
+  const toBound = ghanaDayBounds(parseGhanaDateKey(toKey)).end;
+
+  const [clockIns, members] = await Promise.all([
+    Attendance.find({
+      attendanceType: 'CLOCK_IN',
+      timestamp: { $gte: fromBound, $lte: toBound },
+    })
+      .select('employeeId fullName timestamp status')
+      .lean(),
+    User.find({
+      employmentStatus: 'ACTIVE',
+      role: { $in: ['EMPLOYEE', 'SUPERVISOR'] },
+    })
+      .select('employeeId fullName phone town registeredAt')
+      .lean(),
+  ]);
+
+  const dayMap = new Map();
+  for (const row of clockIns) {
+    const key = ghanaDateKey(row.timestamp);
+    if (!dayMap.has(key)) dayMap.set(key, new Map());
+    const people = dayMap.get(key);
+    if (people.has(row.employeeId)) continue;
+    people.set(row.employeeId, row.status === 'LATE' ? 'LATE' : 'ON_TIME');
+  }
+
+  // Prefer days that had at least one clock-in; if none, still report empty pie
+  const serviceKeys = [...dayMap.keys()].sort();
+  const memberStats = new Map(
+    members.map((m) => [
+      m.employeeId,
+      {
+        employeeId: m.employeeId,
+        fullName: m.fullName,
+        phone: m.phone || '',
+        town: m.town || '',
+        onTime: 0,
+        late: 0,
+        absent: 0,
+        servicesExpected: 0,
+      },
+    ]),
+  );
+
+  let totalOnTime = 0;
+  let totalLate = 0;
+  let totalAbsent = 0;
+
+  for (const key of serviceKeys) {
+    const { end } = ghanaDayBounds(parseGhanaDateKey(key));
+    const dayPeople = dayMap.get(key);
+    const eligible = members.filter((m) => !m.registeredAt || new Date(m.registeredAt) <= end);
+
+    for (const m of eligible) {
+      const stat = memberStats.get(m.employeeId);
+      if (!stat) continue;
+      stat.servicesExpected += 1;
+      const status = dayPeople.get(m.employeeId);
+      if (status === 'LATE') {
+        stat.late += 1;
+        totalLate += 1;
+      } else if (status === 'ON_TIME') {
+        stat.onTime += 1;
+        totalOnTime += 1;
+      } else {
+        stat.absent += 1;
+        totalAbsent += 1;
+      }
+    }
+  }
+
+  const memberRows = [...memberStats.values()]
+    .filter((m) => m.servicesExpected > 0)
+    .map((m) => {
+      const attended = m.onTime + m.late;
+      const punctualRate =
+        m.servicesExpected > 0 ? Math.round((m.onTime / m.servicesExpected) * 1000) / 10 : 0;
+      const attendanceRate =
+        m.servicesExpected > 0 ? Math.round((attended / m.servicesExpected) * 1000) / 10 : 0;
+      return { ...m, punctualRate, attendanceRate };
+    })
+    .sort((a, b) => b.punctualRate - a.punctualRate || b.attendanceRate - a.attendanceRate);
+
+  const total = totalOnTime + totalLate + totalAbsent;
+
+  return ok(res, {
+    timezone: 'Africa/Accra',
+    range: { from: fromKey, to: toKey },
+    servicesCounted: serviceKeys.length,
+    serviceDates: serviceKeys,
+    totals: {
+      onTime: totalOnTime,
+      late: totalLate,
+      absent: totalAbsent,
+      total,
+    },
+    pie: [
+      {
+        key: 'onTime',
+        label: 'Punctual (on time)',
+        value: totalOnTime,
+        percent: total ? Math.round((totalOnTime / total) * 1000) / 10 : 0,
+        color: '#16A34A',
+      },
+      {
+        key: 'late',
+        label: 'Late',
+        value: totalLate,
+        percent: total ? Math.round((totalLate / total) * 1000) / 10 : 0,
+        color: '#DC2626',
+      },
+      {
+        key: 'absent',
+        label: 'Absent',
+        value: totalAbsent,
+        percent: total ? Math.round((totalAbsent / total) * 1000) / 10 : 0,
+        color: '#64748B',
+      },
+    ],
+    members: memberRows,
+    mostPunctual: memberRows.filter((m) => m.onTime > 0).slice(0, 10),
+    oftenLate: [...memberRows].sort((a, b) => b.late - a.late || b.absent - a.absent).slice(0, 10),
+    oftenAbsent: [...memberRows].sort((a, b) => b.absent - a.absent).slice(0, 10),
+  });
 }
 
 async function autoClockOut(req, res) {
@@ -454,6 +665,8 @@ module.exports = {
   createAttendance,
   listAttendance,
   todayAttendance,
+  listSessions,
+  attendanceAnalytics,
   autoClockOut,
   runAutoClockOut,
   buildServiceReport,

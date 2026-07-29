@@ -10,6 +10,7 @@ import PeopleScreen from './src/screens/PeopleScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import RegisterMemberScreen from './src/screens/RegisterMemberScreen';
 import SyncScreen from './src/screens/SyncScreen';
+import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import StatusScreen from './src/screens/StatusScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -26,6 +27,7 @@ export default function App() {
           <Stack.Screen name="RegisterMember" component={RegisterMemberScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Sync" component={SyncScreen} />
+          <Stack.Screen name="Analytics" component={AnalyticsScreen} />
           <Stack.Screen name="Status" component={StatusScreen} />
         </Stack.Navigator>
       </NavigationContainer>

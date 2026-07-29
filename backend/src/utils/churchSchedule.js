@@ -62,6 +62,31 @@ function ghanaDayBounds(date = new Date()) {
   return { start, end, dateKey: key };
 }
 
+/** Parse YYYY-MM-DD into a Date at noon Ghana (UTC) that day. */
+function parseGhanaDateKey(dateKey) {
+  const key = String(dateKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+  const d = new Date(`${key}T12:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+/**
+ * Inclusive list of Ghana date keys from → to.
+ */
+function ghanaDateKeyRange(fromKey, toKey) {
+  const from = parseGhanaDateKey(fromKey);
+  const to = parseGhanaDateKey(toKey);
+  if (!from || !to || from > to) return [];
+  const out = [];
+  const cur = new Date(from);
+  while (cur <= to) {
+    out.push(ghanaDateKey(cur));
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return out;
+}
+
 function ghanaServiceEndDate(date = new Date()) {
   const { dateKey } = ghanaDayBounds(date);
   const { hour, minute } = SCHEDULE.serviceEnd;
@@ -140,6 +165,8 @@ module.exports = {
   ghanaMinutes,
   ghanaDateKey,
   ghanaDayBounds,
+  parseGhanaDateKey,
+  ghanaDateKeyRange,
   ghanaServiceEndDate,
   formatGhanaStamp,
   formatGhanaTime,

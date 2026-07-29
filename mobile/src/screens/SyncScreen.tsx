@@ -15,7 +15,7 @@ import * as Sharing from 'expo-sharing';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
-import { syncFaces, todayAttendance } from '../api';
+import { syncFaces, todayAttendance, listSessions } from '../api';
 import { RootStackParamList } from '../navigation';
 import Screen from '../components/Screen';
 
@@ -32,6 +32,17 @@ type AttendanceRow = {
   status?: string;
   clockOut?: { stampedTime?: string; stampedAt?: string } | null;
 };
+
+type SessionItem = {
+  dateKey: string;
+  onTime: number;
+  late: number;
+  attended: number;
+  absent: number;
+  totalRegistered: number;
+};
+
+const LIVE_POLL_MS = 5000;
 
 function escapeHtml(value: string) {
   return String(value || '')
@@ -151,8 +162,12 @@ export default function SyncScreen({ navigation }: Props) {
   const [busy, setBusy] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [loadingToday, setLoadingToday] = useState(true);
+  const [live, setLive] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(undefined);
+  const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [lastSyncAt, setLastSyncAt] = useState('');
   const [message, setMessage] = useState(
-    'Today’s church session — registered, present, late, and absent with phone numbers.',
+    'Live register — Android and desktop share the same session. Past dates stay saved for reporting.',
   );
   const [present, setPresent] = useState<AttendanceRow[]>([]);
   const [late, setLate] = useState<AttendanceRow[]>([]);
@@ -171,50 +186,74 @@ export default function SyncScreen({ navigation }: Props) {
     'Service 7:30 AM · Late from 9:30 AM · Auto clock-out 2:00 PM (Ghana)',
   );
 
-  const loadToday = useCallback(async () => {
-    setLoadingToday(true);
+  const applyReport = useCallback((data: NonNullable<Awaited<ReturnType<typeof todayAttendance>>['data']>) => {
+    setPresent((data.present as AttendanceRow[]) || []);
+    setLate((data.late as AttendanceRow[]) || []);
+    setAbsent((data.absent as AttendanceRow[]) || []);
+    setDateKey(data.dateKey || '');
+    setLive(!!data.live);
+    setServiceEnded(!!data.serviceEnded);
+    setSummary({
+      present: data.summary?.present || 0,
+      late: data.summary?.late || 0,
+      absent: data.summary?.absent || 0,
+      attended: data.summary?.attended || 0,
+      totalRegistered: data.summary?.totalRegistered || 0,
+    });
+    if (data.schedule) {
+      if (data.schedule.assembly) setAssembly(data.schedule.assembly);
+      setScheduleNote(
+        `Service ${data.schedule.serviceStart} · Late from ${data.schedule.lateAfter} · Auto out ${data.schedule.serviceEnd} (Ghana)`,
+      );
+    }
+    setLastSyncAt(new Date().toLocaleTimeString());
+    if (data.live) {
+      setMessage(
+        `Live sync on — Android clock-ins appear here within seconds. Present ${data.summary?.attended || 0} · Absent ${data.summary?.absent || 0}.`,
+      );
+    } else {
+      setMessage(
+        `Saved session for ${data.dateKey}. Present ${data.summary?.attended || 0} · Absent ${data.summary?.absent || 0}.`,
+      );
+    }
+  }, []);
+
+  const loadReport = useCallback(
+    async (date?: string, silent = false) => {
+      if (!silent) setLoadingToday(true);
+      try {
+        const res = await todayAttendance(date);
+        if (res.success && res.data) applyReport(res.data);
+      } catch {
+        /* ignore — may need login */
+      } finally {
+        if (!silent) setLoadingToday(false);
+      }
+    },
+    [applyReport],
+  );
+
+  const loadSessions = useCallback(async () => {
     try {
-      const res = await todayAttendance();
-      if (res.success && res.data) {
-        setPresent((res.data.present as AttendanceRow[]) || []);
-        setLate((res.data.late as AttendanceRow[]) || []);
-        setAbsent((res.data.absent as AttendanceRow[]) || []);
-        setDateKey(res.data.dateKey || '');
-        setServiceEnded(!!res.data.serviceEnded);
-        setSummary({
-          present: res.data.summary?.present || 0,
-          late: res.data.summary?.late || 0,
-          absent: res.data.summary?.absent || 0,
-          attended: res.data.summary?.attended || 0,
-          totalRegistered: res.data.summary?.totalRegistered || 0,
-        });
-        if (res.data.schedule) {
-          if (res.data.schedule.assembly) setAssembly(res.data.schedule.assembly);
-          setScheduleNote(
-            `Service ${res.data.schedule.serviceStart} · Late from ${res.data.schedule.lateAfter} · Auto out ${res.data.schedule.serviceEnd} (Ghana)`,
-          );
-        }
-        if (res.data.serviceEnded) {
-          setMessage(
-            `Session ended. Present ${res.data.summary?.attended || 0} · Absent ${res.data.summary?.absent || 0}. Use Print for the full list with phones.`,
-          );
-        } else {
-          setMessage(
-            `Session live. Registered ${res.data.summary?.totalRegistered || 0} · Present ${res.data.summary?.attended || 0} · Absent ${res.data.summary?.absent || 0}.`,
-          );
-        }
+      const res = await listSessions();
+      if (res.success && res.data?.sessions) {
+        setSessions(res.data.sessions);
       }
     } catch {
-      /* ignore — may need login */
-    } finally {
-      setLoadingToday(false);
+      /* ignore */
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadToday();
-    }, [loadToday]),
+      loadReport(selectedDate);
+      loadSessions();
+      const timer = setInterval(() => {
+        // Keep Android ↔ desktop in sync for today's live register
+        if (!selectedDate) loadReport(undefined, true);
+      }, LIVE_POLL_MS);
+      return () => clearInterval(timer);
+    }, [loadReport, loadSessions, selectedDate]),
   );
 
   async function runSync() {
@@ -225,7 +264,8 @@ export default function SyncScreen({ navigation }: Props) {
       if (res.success) {
         const count = res.data?.users?.length || 0;
         setMessage(`Synced ${count} members`);
-        await loadToday();
+        await loadReport(selectedDate);
+        await loadSessions();
       } else {
         setMessage(res.message || 'Sync failed — login in Settings first');
       }
@@ -234,6 +274,11 @@ export default function SyncScreen({ navigation }: Props) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function selectSession(key?: string) {
+    setSelectedDate(key);
+    loadReport(key);
   }
 
   async function printSession() {
@@ -346,6 +391,11 @@ export default function SyncScreen({ navigation }: Props) {
           <Text style={styles.body}>{message}</Text>
           <Text style={styles.schedule}>{scheduleNote}</Text>
           {!!dateKey && <Text style={styles.dateKey}>Date: {dateKey} (Ghana)</Text>}
+          {live && (
+            <Text style={styles.liveBanner}>
+              LIVE · updates every {LIVE_POLL_MS / 1000}s · last {lastSyncAt || '—'}
+            </Text>
+          )}
           {serviceEnded && (
             <Text style={styles.closedBanner}>Church closed · Auto clock-out done</Text>
           )}
@@ -372,7 +422,40 @@ export default function SyncScreen({ navigation }: Props) {
               )}
             </Pressable>
           </View>
+          <Pressable style={styles.linkBtn} onPress={() => navigation.navigate('Analytics')}>
+            <Ionicons name="pie-chart" size={18} color={colors.accent} />
+            <Text style={styles.linkText}>Punctuality analysis (pie chart)</Text>
+          </Pressable>
         </View>
+
+        <Text style={styles.section}>Saved service dates</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dateStrip}>
+          <Pressable
+            style={[styles.dateChip, !selectedDate && styles.dateChipActive]}
+            onPress={() => selectSession(undefined)}
+          >
+            <Text style={[styles.dateChipText, !selectedDate && styles.dateChipTextActive]}>
+              Today (live)
+            </Text>
+          </Pressable>
+          {sessions.map((s) => {
+            const active = selectedDate === s.dateKey;
+            return (
+              <Pressable
+                key={s.dateKey}
+                style={[styles.dateChip, active && styles.dateChipActive]}
+                onPress={() => selectSession(s.dateKey)}
+              >
+                <Text style={[styles.dateChipText, active && styles.dateChipTextActive]}>
+                  {s.dateKey}
+                </Text>
+                <Text style={[styles.dateChipSub, active && styles.dateChipTextActive]}>
+                  {s.attended} in · {s.absent} out
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
         <View style={styles.summaryRow}>
           <View style={[styles.summaryCard, styles.summaryRegistered]}>
@@ -450,6 +533,16 @@ const styles = StyleSheet.create({
   body: { fontSize: 15, color: colors.text, lineHeight: 22, textAlign: 'center' },
   schedule: { fontSize: 12, color: colors.accent, textAlign: 'center', fontWeight: '600' },
   dateKey: { fontSize: 12, color: colors.textMuted, fontWeight: '600' },
+  liveBanner: {
+    color: colors.bg,
+    backgroundColor: colors.success,
+    overflow: 'hidden',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontWeight: '800',
+    fontSize: 12,
+  },
   closedBanner: {
     color: colors.white,
     backgroundColor: colors.accentRed,
@@ -474,6 +567,32 @@ const styles = StyleSheet.create({
   },
   printBtn: { backgroundColor: colors.tileSync },
   btnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  linkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    paddingVertical: 8,
+  },
+  linkText: { color: colors.accent, fontWeight: '700', fontSize: 14 },
+  dateStrip: { marginBottom: 4, maxHeight: 72 },
+  dateChip: {
+    backgroundColor: colors.panel,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    minWidth: 110,
+  },
+  dateChipActive: {
+    backgroundColor: colors.tileSync,
+    borderColor: colors.tileSync,
+  },
+  dateChipText: { color: colors.text, fontWeight: '800', fontSize: 13 },
+  dateChipSub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+  dateChipTextActive: { color: colors.white },
   summaryRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
   summaryCard: {
     flex: 1,
