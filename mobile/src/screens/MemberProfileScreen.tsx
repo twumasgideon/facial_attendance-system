@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +18,7 @@ import { deactivateMember, getEmployee, updateMember } from '../api';
 import { RootStackParamList } from '../navigation';
 import FaceCaptureModal from '../components/FaceCaptureModal';
 import Screen from '../components/Screen';
+import { confirmAction, notify } from '../utils/printHtml';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MemberProfile'>;
 
@@ -65,15 +66,15 @@ export default function MemberProfileScreen({ navigation, route }: Props) {
 
   async function onSave() {
     if (!fullName.trim()) {
-      Alert.alert('Name required', 'Full name cannot be empty.');
+      notify('Name required', 'Full name cannot be empty.');
       return;
     }
     if (!phone.trim()) {
-      Alert.alert('Phone required', 'Phone number is required.');
+      notify('Phone required', 'Phone number is required.');
       return;
     }
     if (!town.trim()) {
-      Alert.alert('Town required', 'Town / location is required.');
+      notify('Town required', 'Town / location is required.');
       return;
     }
 
@@ -95,47 +96,40 @@ export default function MemberProfileScreen({ navigation, route }: Props) {
 
       const res = await updateMember(employeeId, body);
       if (res.success) {
-        Alert.alert('Saved', 'Member profile updated.');
-        setPhotoBase64('');
-        await load();
+        notify('Successful', 'Member profile updated successfully.', () => {
+          navigation.navigate('People');
+        });
       } else {
-        Alert.alert('Update failed', res.message || 'Could not save');
+        notify('Update failed', res.message || 'Could not save');
       }
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Network error');
+      notify('Error', e instanceof Error ? e.message : 'Network error');
     } finally {
       setSaving(false);
     }
   }
 
   function onDelete() {
-    Alert.alert(
+    confirmAction(
       'Delete member?',
-      `Remove ${fullName || employeeId} from the church register? This cannot be undone from the app.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setSaving(true);
-            try {
-              const res = await deactivateMember(employeeId);
-              if (res.success) {
-                Alert.alert('Deleted', 'Member removed.', [
-                  { text: 'OK', onPress: () => navigation.navigate('People') },
-                ]);
-              } else {
-                Alert.alert('Delete failed', res.message || 'Could not delete');
-              }
-            } catch (e) {
-              Alert.alert('Error', e instanceof Error ? e.message : 'Network error');
-            } finally {
-              setSaving(false);
-            }
-          },
-        },
-      ],
+      `Remove ${fullName || employeeId} from the church register?`,
+      async () => {
+        setSaving(true);
+        try {
+          const res = await deactivateMember(employeeId);
+          if (res.success) {
+            notify('Deleted', 'Member removed successfully.', () => {
+              navigation.navigate('People');
+            });
+          } else {
+            notify('Delete failed', res.message || 'Could not delete');
+          }
+        } catch (e) {
+          notify('Error', e instanceof Error ? e.message : 'Network error');
+        } finally {
+          setSaving(false);
+        }
+      },
     );
   }
 
@@ -149,7 +143,7 @@ export default function MemberProfileScreen({ navigation, route }: Props) {
 
   return (
     <Screen padding={0}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={22} color={colors.text} />
@@ -186,29 +180,34 @@ export default function MemberProfileScreen({ navigation, route }: Props) {
         <Text style={styles.idNote}>Internal ID: {employeeId}</Text>
 
         <Field label="Full name *" value={fullName} onChangeText={setFullName} />
-        <Field
-          label="Phone *"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
+        <Field label="Phone *" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
         <Field label="Town / Location *" value={town} onChangeText={setTown} />
         <Field label="Position" value={position} onChangeText={setPosition} />
 
-        <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={onSave} disabled={saving}>
-          {saving ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Text style={styles.saveText}>Save changes</Text>
-          )}
-        </Pressable>
+        {/* Sticky-feeling action block — always at end of form so desktop users see it */}
+        <View style={styles.actions}>
+          <Pressable style={[styles.saveBtn, saving && styles.disabled]} onPress={onSave} disabled={saving}>
+            {saving ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.saveText}>Save changes</Text>
+            )}
+          </Pressable>
 
-        <Pressable style={[styles.deleteBtn, saving && styles.disabled]} onPress={onDelete} disabled={saving}>
-          <Ionicons name="trash" size={18} color={colors.white} />
-          <Text style={styles.deleteText}>Delete member</Text>
-        </Pressable>
+          <Pressable
+            style={[styles.deleteBtn, saving && styles.disabled]}
+            onPress={onDelete}
+            disabled={saving}
+          >
+            <Ionicons name="trash" size={18} color={colors.white} />
+            <Text style={styles.deleteText}>Delete member</Text>
+          </Pressable>
+        </View>
 
         {!!message && <Text style={styles.message}>{message}</Text>}
+        {Platform.OS === 'web' && (
+          <Text style={styles.hint}>Scroll down if needed to reach Save changes.</Text>
+        )}
       </ScrollView>
     </Screen>
   );
@@ -227,7 +226,7 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 16, paddingBottom: 40 },
+  container: { paddingHorizontal: 16, paddingBottom: 48 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 18 },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
@@ -270,16 +269,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: colors.text,
   },
+  actions: { marginTop: 16, gap: 12 },
   saveBtn: {
-    marginTop: 8,
     backgroundColor: colors.tileSync,
     borderRadius: 14,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   saveText: { color: colors.white, fontWeight: '800', fontSize: 16 },
   deleteBtn: {
-    marginTop: 12,
     backgroundColor: colors.accentRed,
     borderRadius: 14,
     paddingVertical: 14,
@@ -291,4 +289,5 @@ const styles = StyleSheet.create({
   deleteText: { color: colors.white, fontWeight: '800', fontSize: 15 },
   disabled: { opacity: 0.6 },
   message: { marginTop: 12, color: colors.accent, fontWeight: '600' },
+  hint: { marginTop: 10, color: colors.textMuted, fontSize: 12, textAlign: 'center' },
 });

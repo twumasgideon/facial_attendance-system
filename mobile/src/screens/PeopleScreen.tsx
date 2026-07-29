@@ -1,7 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   Pressable,
@@ -17,7 +16,7 @@ import { colors } from '../theme';
 import { listEmployees } from '../api';
 import { RootStackParamList } from '../navigation';
 import Screen from '../components/Screen';
-import { alertPrintError, printHtml } from '../utils/printHtml';
+import { alertPrintError, notify, printHtml } from '../utils/printHtml';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'People'>;
 
@@ -85,36 +84,53 @@ function buildMembersPrintHtml(people: Person[]) {
 </html>`;
 }
 
+function matchesSearch(person: Person, term: string) {
+  const t = term.trim().toLowerCase();
+  if (!t) return true;
+  const hay = [
+    person.fullName,
+    person.town,
+    person.phone,
+    person.position,
+    person.employeeId,
+  ]
+    .map((v) => String(v || '').toLowerCase())
+    .join(' ');
+  return hay.includes(t);
+}
+
 export default function PeopleScreen({ navigation }: Props) {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
   const [printing, setPrinting] = useState(false);
-  const [people, setPeople] = useState<Person[]>([]);
+  const [allPeople, setAllPeople] = useState<Person[]>([]);
   const [error, setError] = useState('');
 
-  const load = useCallback(async (search = q) => {
+  const people = useMemo(() => allPeople.filter((p) => matchesSearch(p, q)), [allPeople, q]);
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const res = await listEmployees(search);
-      if (res.success) setPeople((res.data?.users as Person[]) || []);
+      const res = await listEmployees('');
+      if (res.success) setAllPeople((res.data?.users as Person[]) || []);
       else setError(res.message || 'Failed to load people');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error');
     } finally {
       setLoading(false);
     }
-  }, [q]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      load('');
+      load();
     }, [load]),
   );
 
   async function printMembers() {
     if (!people.length) {
-      Alert.alert('No members', 'There are no members to print.');
+      notify('No members', 'There are no members matching your search to print.');
       return;
     }
     setPrinting(true);
@@ -162,12 +178,18 @@ export default function PeopleScreen({ navigation }: Props) {
           onChangeText={setQ}
           placeholder="Search name, town, or phone"
           placeholderTextColor={colors.textMuted}
-          onSubmitEditing={() => load(q)}
+          autoCorrect={false}
+          clearButtonMode="while-editing"
         />
-        <Pressable style={styles.searchBtn} onPress={() => load(q)}>
-          <Text style={styles.searchText}>Search</Text>
-        </Pressable>
+        {!!q && (
+          <Pressable style={styles.clearBtn} onPress={() => setQ('')}>
+            <Text style={styles.clearText}>Clear</Text>
+          </Pressable>
+        )}
       </View>
+      <Text style={styles.searchHint}>
+        Showing {people.length} of {allPeople.length} · filter updates as you type
+      </Text>
 
       {loading ? (
         <ActivityIndicator color={colors.teal} style={{ marginTop: 24 }} />
@@ -178,6 +200,7 @@ export default function PeopleScreen({ navigation }: Props) {
           data={people}
           keyExtractor={(item, idx) => item.employeeId || String(idx)}
           contentContainerStyle={{ paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <Pressable
               style={styles.card}
@@ -205,10 +228,14 @@ export default function PeopleScreen({ navigation }: Props) {
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Text style={styles.empty}>No members found</Text>
-              <Pressable style={styles.emptyBtn} onPress={() => navigation.navigate('RegisterMember')}>
-                <Text style={styles.emptyBtnText}>Register first member</Text>
-              </Pressable>
+              <Text style={styles.empty}>
+                {q.trim() ? 'No members match that search.' : 'No members found'}
+              </Text>
+              {!q.trim() && (
+                <Pressable style={styles.emptyBtn} onPress={() => navigation.navigate('RegisterMember')}>
+                  <Text style={styles.emptyBtnText}>Register first member</Text>
+                </Pressable>
+              )}
             </View>
           }
         />
@@ -242,7 +269,7 @@ const styles = StyleSheet.create({
   },
   addText: { color: colors.white, fontWeight: '700' },
   disabled: { opacity: 0.6 },
-  searchRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  searchRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
   input: {
     flex: 1,
     backgroundColor: colors.inputBg,
@@ -253,13 +280,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: colors.text,
   },
-  searchBtn: {
-    backgroundColor: colors.tilePeople,
-    borderRadius: 12,
-    paddingHorizontal: 14,
+  clearBtn: {
     justifyContent: 'center',
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.panel,
   },
-  searchText: { color: colors.white, fontWeight: '700' },
+  clearText: { color: colors.accent, fontWeight: '700' },
+  searchHint: { color: colors.textMuted, fontSize: 12, marginBottom: 10 },
   card: {
     backgroundColor: colors.panel,
     borderRadius: 16,
