@@ -7,6 +7,7 @@ import { RootStackParamList } from './src/navigation';
 import HomeScreen from './src/screens/HomeScreen';
 import ClockScreen from './src/screens/ClockScreen';
 import PeopleScreen from './src/screens/PeopleScreen';
+import MemberProfileScreen from './src/screens/MemberProfileScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import RegisterMemberScreen from './src/screens/RegisterMemberScreen';
 import SyncScreen from './src/screens/SyncScreen';
@@ -24,6 +25,7 @@ export default function App() {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Clock" component={ClockScreen} />
           <Stack.Screen name="People" component={PeopleScreen} />
+          <Stack.Screen name="MemberProfile" component={MemberProfileScreen} />
           <Stack.Screen name="RegisterMember" component={RegisterMemberScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Sync" component={SyncScreen} />

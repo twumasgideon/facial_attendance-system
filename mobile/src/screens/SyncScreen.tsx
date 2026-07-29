@@ -11,14 +11,13 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { syncFaces, todayAttendance } from '../api';
 import { RootStackParamList } from '../navigation';
 import Screen from '../components/Screen';
+import { alertPrintError, printHtml } from '../utils/printHtml';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Sync'>;
 
@@ -280,35 +279,13 @@ export default function SyncScreen({ navigation }: Props) {
         absent,
         serviceEnded,
       });
-
-      if (Platform.OS === 'web') {
-        const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
-        if (!w) {
-          Alert.alert('Pop-up blocked', 'Allow pop-ups to print the session report.');
-          return;
-        }
-        w.document.write(html);
-        w.document.close();
-        w.focus();
-        setTimeout(() => w.print(), 300);
-        setMessage('Session report opened for printing');
-        return;
-      }
-
-      const { uri } = await Print.printToFileAsync({ html });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Print or share session report',
-          UTI: 'com.adobe.pdf',
-        });
-      } else {
-        await Print.printAsync({ html });
-      }
-      setMessage('Session report ready to print or share');
+      await printHtml(html, {
+        dialogTitle: 'Print session report',
+        onWebPrinted: () => setMessage('Print dialog opened'),
+      });
+      if (Platform.OS !== 'web') setMessage('Session report ready to print or share');
     } catch (e) {
-      Alert.alert('Print failed', e instanceof Error ? e.message : 'Could not create report');
+      alertPrintError(e);
     } finally {
       setPrinting(false);
     }

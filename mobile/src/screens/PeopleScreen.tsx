@@ -4,7 +4,6 @@ import {
   Alert,
   FlatList,
   Image,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -12,14 +11,13 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
 import { listEmployees } from '../api';
 import { RootStackParamList } from '../navigation';
 import Screen from '../components/Screen';
+import { alertPrintError, printHtml } from '../utils/printHtml';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'People'>;
 
@@ -121,32 +119,9 @@ export default function PeopleScreen({ navigation }: Props) {
     }
     setPrinting(true);
     try {
-      const html = buildMembersPrintHtml(people);
-      if (Platform.OS === 'web') {
-        const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
-        if (!w) {
-          Alert.alert('Pop-up blocked', 'Allow pop-ups to print the member list.');
-          return;
-        }
-        w.document.write(html);
-        w.document.close();
-        w.focus();
-        setTimeout(() => w.print(), 300);
-        return;
-      }
-      const { uri } = await Print.printToFileAsync({ html });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Print or share members',
-          UTI: 'com.adobe.pdf',
-        });
-      } else {
-        await Print.printAsync({ html });
-      }
+      await printHtml(buildMembersPrintHtml(people), { dialogTitle: 'Print members' });
     } catch (e) {
-      Alert.alert('Print failed', e instanceof Error ? e.message : 'Could not print');
+      alertPrintError(e);
     } finally {
       setPrinting(false);
     }
@@ -204,7 +179,14 @@ export default function PeopleScreen({ navigation }: Props) {
           keyExtractor={(item, idx) => item.employeeId || String(idx)}
           contentContainerStyle={{ paddingBottom: 24 }}
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <Pressable
+              style={styles.card}
+              onPress={() => {
+                if (item.employeeId) {
+                  navigation.navigate('MemberProfile', { employeeId: item.employeeId });
+                }
+              }}
+            >
               {item.photoUrl ? (
                 <Image source={{ uri: item.photoUrl }} style={styles.avatarImg} />
               ) : (
@@ -218,7 +200,8 @@ export default function PeopleScreen({ navigation }: Props) {
                 {!!item.town && <Text style={styles.meta}>Town: {item.town}</Text>}
                 {!!item.phone && <Text style={styles.phone}>Phone: {item.phone}</Text>}
               </View>
-            </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </Pressable>
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
