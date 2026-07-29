@@ -55,7 +55,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      "expo-sharing"
     ],
     "extra": {
       "apiUrl": "https://facial-attendance-system-wheat.vercel.app/api/v1",

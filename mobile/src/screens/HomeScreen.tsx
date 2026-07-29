@@ -127,10 +127,10 @@ export default function HomeScreen({ navigation }: Props) {
     },
     {
       key: 'sync',
-      title: 'Sync Faces',
-      subtitle: 'Present / absent today',
+      title: 'Session Report',
+      subtitle: 'Present · absent · print',
       color: colors.tileSync,
-      icon: <Ionicons name="sync" size={36} color={colors.accent} />,
+      icon: <Ionicons name="print" size={36} color={colors.accent} />,
       onPress: () => navigation.navigate('Sync'),
     },
     {
