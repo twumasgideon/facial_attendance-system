@@ -154,6 +154,7 @@ export async function registerMember(body: {
   fullName: string;
   email?: string;
   phone?: string;
+  town?: string;
   position?: string;
   departmentCode?: string;
   departmentName?: string;
@@ -171,6 +172,7 @@ export async function updateMember(
   body: {
     fullName?: string;
     phone?: string;
+    town?: string;
     position?: string;
     photoBase64?: string;
     branchCode?: string;

@@ -26,6 +26,7 @@ type AttendanceRow = {
   memberId?: string;
   fullName?: string;
   phone?: string;
+  town?: string;
   stampedTime?: string;
   stampedAt?: string;
   status?: string;
@@ -58,13 +59,14 @@ function buildSessionReportHtml(opts: {
 }) {
   const rows = (list: AttendanceRow[], kind: string) =>
     list.length === 0
-      ? `<tr><td colspan="3" style="color:#666;padding:8px;">None</td></tr>`
+      ? `<tr><td colspan="4" style="color:#666;padding:8px;">None</td></tr>`
       : list
           .map(
             (item, i) => `
       <tr>
         <td style="padding:8px;border-bottom:1px solid #ddd;">${i + 1}</td>
         <td style="padding:8px;border-bottom:1px solid #ddd;">${escapeHtml(item.fullName || '—')}</td>
+        <td style="padding:8px;border-bottom:1px solid #ddd;">${escapeHtml(item.town || '—')}</td>
         <td style="padding:8px;border-bottom:1px solid #ddd;">${escapeHtml(item.phone || 'Not registered')}</td>
         ${
           kind === 'absent'
@@ -81,6 +83,7 @@ function buildSessionReportHtml(opts: {
     <tr style="background:#0B2E8C;color:#fff;">
       <th style="text-align:left;padding:8px;">#</th>
       <th style="text-align:left;padding:8px;">Name</th>
+      <th style="text-align:left;padding:8px;">Town</th>
       <th style="text-align:left;padding:8px;">Phone</th>
       <th style="text-align:left;padding:8px;">Clock-in</th>
     </tr>`;
@@ -89,6 +92,7 @@ function buildSessionReportHtml(opts: {
     <tr style="background:#444;color:#fff;">
       <th style="text-align:left;padding:8px;">#</th>
       <th style="text-align:left;padding:8px;">Name</th>
+      <th style="text-align:left;padding:8px;">Town</th>
       <th style="text-align:left;padding:8px;">Phone</th>
     </tr>`;
 
@@ -310,6 +314,7 @@ export default function SyncScreen({ navigation }: Props) {
                 : ''}
           </Text>
           <Text style={styles.phone}>Phone: {item.phone || 'Not registered'}</Text>
+          {!!item.town && <Text style={styles.town}>Town: {item.town}</Text>}
         </View>
         <Text
           style={[
@@ -508,6 +513,7 @@ const styles = StyleSheet.create({
   rowName: { color: colors.text, fontWeight: '700', fontSize: 15 },
   rowMeta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   phone: { color: colors.accent, fontSize: 12, marginTop: 4, fontWeight: '700' },
+  town: { color: colors.textMuted, fontSize: 12, marginTop: 2, fontWeight: '600' },
   tag: {
     fontSize: 10,
     fontWeight: '800',

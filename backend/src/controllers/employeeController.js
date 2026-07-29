@@ -76,6 +76,8 @@ async function listEmployees(req, res) {
     filter.$or = [
       { fullName: new RegExp(q, 'i') },
       { employeeId: new RegExp(q, 'i') },
+      { town: new RegExp(q, 'i') },
+      { phone: new RegExp(q, 'i') },
     ];
   }
   if (req.query.branchCode) {
@@ -108,6 +110,7 @@ const createValidators = [
   body('branchCode').optional().isString().trim(),
   body('email').optional({ nullable: true }).isEmail(),
   body('phone').optional().isString(),
+  body('town').optional().isString(),
   body('position').optional().isString(),
   body('departmentCode').optional().isString(),
   body('departmentName').optional().isString(),
@@ -134,6 +137,7 @@ async function createEmployee(req, res) {
     fullName,
     email,
     phone = '',
+    town = '',
     position = '',
     departmentCode,
     departmentName,
@@ -157,6 +161,11 @@ async function createEmployee(req, res) {
   const phoneTrimmed = String(phone || '').trim();
   if (!phoneTrimmed) {
     return fail(res, 'Registered phone number is required', 400);
+  }
+
+  const townTrimmed = String(town || '').trim();
+  if (!townTrimmed) {
+    return fail(res, 'Town or location is required', 400);
   }
 
   const photoUrl = normalizePhoto(photoBase64);
@@ -191,6 +200,7 @@ async function createEmployee(req, res) {
     email: safeEmail,
     passwordHash: await hashPassword('Employee123!'),
     phone: phoneTrimmed,
+    town: townTrimmed,
     role,
     department: dept._id,
     branch: branch._id,
@@ -213,6 +223,7 @@ const updateValidators = [
   body('fullName').optional().isString().trim().notEmpty(),
   body('email').optional().isEmail(),
   body('phone').optional().isString(),
+  body('town').optional().isString(),
   body('position').optional().isString(),
   body('departmentCode').optional().isString(),
   body('departmentName').optional().isString(),
@@ -236,6 +247,7 @@ async function updateEmployee(req, res) {
     user.email = email;
   }
   if (req.body.phone !== undefined) user.phone = String(req.body.phone).trim();
+  if (req.body.town !== undefined) user.town = String(req.body.town).trim();
   if (req.body.position !== undefined) user.position = String(req.body.position).trim();
   if (req.body.employmentStatus) user.employmentStatus = req.body.employmentStatus;
 

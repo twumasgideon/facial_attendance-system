@@ -358,11 +358,16 @@ async function buildServiceReport(now = new Date()) {
       employmentStatus: 'ACTIVE',
       role: { $in: ['EMPLOYEE', 'SUPERVISOR'] },
     })
-      .select('employeeId fullName phone faceStatus employmentStatus position')
+      .select('employeeId fullName phone town faceStatus employmentStatus position')
       .sort({ fullName: 1 }),
   ]);
 
-  const phoneById = new Map(members.map((m) => [m.employeeId, m.phone || '']));
+  const memberById = new Map(
+    members.map((m) => [
+      m.employeeId,
+      { phone: m.phone || '', town: m.town || '' },
+    ]),
+  );
   const present = [];
   const late = [];
   const seen = new Set();
@@ -370,10 +375,12 @@ async function buildServiceReport(now = new Date()) {
   for (const record of clockIns) {
     if (seen.has(record.employeeId)) continue;
     seen.add(record.employeeId);
+    const info = memberById.get(record.employeeId) || { phone: '', town: '' };
     const row = {
       ...serializeAttendance(record),
       memberId: record.employeeId,
-      phone: phoneById.get(record.employeeId) || '',
+      phone: info.phone,
+      town: info.town,
       clockOut: null,
     };
     const out = await findTodaysClockOut(record.employeeId, now);
@@ -389,6 +396,7 @@ async function buildServiceReport(now = new Date()) {
       employeeId: m.employeeId,
       fullName: m.fullName,
       phone: m.phone || '',
+      town: m.town || '',
       faceStatus: m.faceStatus,
       position: m.position || 'Member',
       status: 'ABSENT',

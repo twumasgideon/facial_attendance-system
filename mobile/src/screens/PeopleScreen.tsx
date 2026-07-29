@@ -27,6 +27,7 @@ type Person = {
   employmentStatus?: string;
   photoUrl?: string;
   phone?: string;
+  town?: string;
 };
 
 export default function PeopleScreen({ navigation }: Props) {
@@ -74,7 +75,7 @@ export default function PeopleScreen({ navigation }: Props) {
           style={styles.input}
           value={q}
           onChangeText={setQ}
-          placeholder="Search name or ID"
+          placeholder="Search name, town, or phone"
           placeholderTextColor={colors.textMuted}
           onSubmitEditing={() => load(q)}
         />
@@ -106,6 +107,7 @@ export default function PeopleScreen({ navigation }: Props) {
                 <Text style={styles.meta}>
                   {item.employeeId} · {item.position || 'Member'}
                 </Text>
+                {!!item.town && <Text style={styles.meta}>Town: {item.town}</Text>}
                 {!!item.phone && <Text style={styles.meta}>Phone: {item.phone}</Text>}
                 <Text style={styles.meta}>
                   Face: {item.faceStatus || '—'} · {item.employmentStatus || '—'}

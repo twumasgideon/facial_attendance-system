@@ -27,6 +27,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [town, setTown] = useState('');
   const [position, setPosition] = useState('Member');
   const [departmentName, setDepartmentName] = useState('General');
   const [photoUri, setPhotoUri] = useState('');
@@ -78,6 +79,10 @@ export default function RegisterMemberScreen({ navigation }: Props) {
       Alert.alert('Phone required', 'Add the member’s registered phone number.');
       return;
     }
+    if (!town.trim()) {
+      Alert.alert('Town required', 'Add the member’s town or location.');
+      return;
+    }
     if (!photoBase64) {
       Alert.alert('Face photo required', 'Capture or select a face photo before registering.');
       return;
@@ -90,6 +95,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
         fullName: fullName.trim(),
         email: email.trim() || undefined,
         phone: phone.trim(),
+        town: town.trim(),
         position: position.trim() || 'Member',
         departmentCode: 'GEN',
         departmentName: departmentName.trim() || 'General',
@@ -107,6 +113,7 @@ export default function RegisterMemberScreen({ navigation }: Props) {
                 setFullName('');
                 setEmail('');
                 setPhone('');
+                setTown('');
                 setPosition('Member');
                 setPhotoUri('');
                 setPhotoBase64('');
@@ -188,6 +195,12 @@ export default function RegisterMemberScreen({ navigation }: Props) {
           onChangeText={setPhone}
           keyboardType="phone-pad"
           placeholder="024xxxxxxx"
+        />
+        <Field
+          label="Town / Location *"
+          value={town}
+          onChangeText={setTown}
+          placeholder="e.g. Kasse, Kumasi"
         />
         <Field
           label="Email"
