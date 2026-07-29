@@ -1,8 +1,10 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +12,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { colors } from '../theme';
@@ -30,9 +34,63 @@ type Person = {
   town?: string;
 };
 
+function escapeHtml(value: string) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildMembersPrintHtml(people: Person[]) {
+  const rows = people
+    .map(
+      (p, i) => `
+    <tr>
+      <td style="padding:8px;border-bottom:1px solid #ddd;">${i + 1}</td>
+      <td style="padding:8px;border-bottom:1px solid #ddd;">${escapeHtml(p.fullName || '—')}</td>
+      <td style="padding:8px;border-bottom:1px solid #ddd;">${escapeHtml(p.town || '—')}</td>
+      <td style="padding:8px;border-bottom:1px solid #ddd;">${escapeHtml(p.phone || 'Not registered')}</td>
+      <td style="padding:8px;border-bottom:1px solid #ddd;">${escapeHtml(p.position || 'Member')}</td>
+    </tr>`,
+    )
+    .join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Church Members</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; color: #111; padding: 24px; }
+    h1 { margin: 0 0 8px; font-size: 22px; color: #0B2E8C; }
+    .meta { color: #444; font-size: 13px; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 8px; background: #0B2E8C; color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>Church Members Directory</h1>
+  <div class="meta">Church of Pentecost Kasse Assembly Kumasi · ${people.length} member(s)</div>
+  <table>
+    <tr>
+      <th>#</th>
+      <th>Name</th>
+      <th>Town / Location</th>
+      <th>Phone</th>
+      <th>Position</th>
+    </tr>
+    ${rows || '<tr><td colspan="5" style="padding:8px;">No members</td></tr>'}
+  </table>
+  <p style="margin-top:24px;font-size:11px;color:#666;">Printed ${new Date().toLocaleString()}</p>
+</body>
+</html>`;
+}
+
 export default function PeopleScreen({ navigation }: Props) {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
+  const [printing, setPrinting] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
   const [error, setError] = useState('');
 
@@ -56,6 +114,44 @@ export default function PeopleScreen({ navigation }: Props) {
     }, [load]),
   );
 
+  async function printMembers() {
+    if (!people.length) {
+      Alert.alert('No members', 'There are no members to print.');
+      return;
+    }
+    setPrinting(true);
+    try {
+      const html = buildMembersPrintHtml(people);
+      if (Platform.OS === 'web') {
+        const w = window.open('', '_blank', 'noopener,noreferrer,width=900,height=700');
+        if (!w) {
+          Alert.alert('Pop-up blocked', 'Allow pop-ups to print the member list.');
+          return;
+        }
+        w.document.write(html);
+        w.document.close();
+        w.focus();
+        setTimeout(() => w.print(), 300);
+        return;
+      }
+      const { uri } = await Print.printToFileAsync({ html });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Print or share members',
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        await Print.printAsync({ html });
+      }
+    } catch (e) {
+      Alert.alert('Print failed', e instanceof Error ? e.message : 'Could not print');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   return (
     <Screen>
       <View style={styles.header}>
@@ -64,6 +160,20 @@ export default function PeopleScreen({ navigation }: Props) {
           <Text style={styles.back}>Back</Text>
         </Pressable>
         <Text style={styles.title}>Church Members</Text>
+        <Pressable
+          style={[styles.printBtn, printing && styles.disabled]}
+          onPress={printMembers}
+          disabled={printing || loading}
+        >
+          {printing ? (
+            <ActivityIndicator color={colors.white} size="small" />
+          ) : (
+            <>
+              <Ionicons name="print" size={16} color={colors.white} />
+              <Text style={styles.addText}>Print</Text>
+            </>
+          )}
+        </Pressable>
         <Pressable style={styles.addBtn} onPress={() => navigation.navigate('RegisterMember')}>
           <Ionicons name="person-add" size={18} color={colors.white} />
           <Text style={styles.addText}>Add</Text>
@@ -104,20 +214,15 @@ export default function PeopleScreen({ navigation }: Props) {
               )}
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.fullName}</Text>
-                <Text style={styles.meta}>
-                  {item.employeeId} · {item.position || 'Member'}
-                </Text>
+                <Text style={styles.meta}>{item.position || 'Member'}</Text>
                 {!!item.town && <Text style={styles.meta}>Town: {item.town}</Text>}
-                {!!item.phone && <Text style={styles.meta}>Phone: {item.phone}</Text>}
-                <Text style={styles.meta}>
-                  Face: {item.faceStatus || '—'} · {item.employmentStatus || '—'}
-                </Text>
+                {!!item.phone && <Text style={styles.phone}>Phone: {item.phone}</Text>}
               </View>
             </View>
           )}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Text style={styles.empty}>No employees found</Text>
+              <Text style={styles.empty}>No members found</Text>
               <Pressable style={styles.emptyBtn} onPress={() => navigation.navigate('RegisterMember')}>
                 <Text style={styles.emptyBtnText}>Register first member</Text>
               </Pressable>
@@ -133,7 +238,16 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   backBtn: { flexDirection: 'row', alignItems: 'center' },
   back: { color: colors.text, fontWeight: '700', fontSize: 16 },
-  title: { marginLeft: 8, flex: 1, fontSize: 20, fontWeight: '800', color: colors.text },
+  title: { marginLeft: 4, flex: 1, fontSize: 18, fontWeight: '800', color: colors.text },
+  printBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.tilePeople,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -144,6 +258,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   addText: { color: colors.white, fontWeight: '700' },
+  disabled: { opacity: 0.6 },
   searchRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   input: {
     flex: 1,
@@ -183,6 +298,7 @@ const styles = StyleSheet.create({
   avatarText: { color: colors.white, fontWeight: '800', fontSize: 18 },
   name: { fontSize: 16, fontWeight: '700', color: colors.text },
   meta: { marginTop: 3, color: colors.textMuted, fontSize: 13 },
+  phone: { marginTop: 3, color: colors.accent, fontSize: 13, fontWeight: '700' },
   error: { color: colors.danger, marginTop: 16 },
   emptyWrap: { alignItems: 'center', marginTop: 40, gap: 12 },
   empty: { textAlign: 'center', color: colors.textMuted },

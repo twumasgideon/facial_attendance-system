@@ -201,6 +201,7 @@ export async function todayAttendance(dateKey?: string) {
     timezone: string;
     serviceEnded?: boolean;
     live?: boolean;
+    sessionCleared?: boolean;
     schedule: {
       serviceStart: string;
       lateAfter: string;

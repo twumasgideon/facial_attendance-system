@@ -226,16 +226,12 @@ async function createAttendance(req, res) {
 
   if (attendanceType === 'CLOCK_IN') {
     const existingIn = await findTodaysClockIn(user.employeeId, eventTime);
-    const existingOut = await findTodaysClockOut(user.employeeId, eventTime);
-    if (existingIn && !existingOut) {
+    if (existingIn) {
       return fail(
         res,
-        `Already clocked in today at ${formatGhanaTime(existingIn.timestamp)} Ghana time.`,
+        `Already clocked in for today’s service at ${formatGhanaTime(existingIn.timestamp)} Ghana time. You cannot clock in again until the service ends and the next service begins.`,
         409,
       );
-    }
-    if (existingIn && existingOut) {
-      return fail(res, 'Already completed attendance for today (clocked in and out).', 409);
     }
 
     const evalResult = evaluateClockIn(eventTime);
@@ -336,15 +332,38 @@ async function listAttendance(req, res) {
 
 async function todayAttendance(req, res) {
   await runAutoClockOut(new Date());
-  const dateParam = req.query.date;
+  const dateParam = req.query.date ? String(req.query.date).trim() : '';
   let forDate = new Date();
+  let viewingHistory = false;
   if (dateParam) {
     const parsed = parseGhanaDateKey(dateParam);
     if (!parsed) return fail(res, 'Invalid date. Use YYYY-MM-DD', 400);
     forDate = parsed;
+    viewingHistory = true;
   }
+
   const report = await buildServiceReport(forDate);
-  return ok(res, report);
+
+  // Live "Today" only: after service ends (2 PM), clear the live board for the next service.
+  // Saved records remain available by searching the date (e.g. 2026-07-29).
+  if (!viewingHistory && report.live && report.serviceEnded) {
+    return ok(res, {
+      ...report,
+      sessionCleared: true,
+      present: [],
+      late: [],
+      absent: [],
+      summary: {
+        present: 0,
+        late: 0,
+        absent: 0,
+        attended: 0,
+        totalRegistered: report.summary.totalRegistered,
+      },
+    });
+  }
+
+  return ok(res, { ...report, sessionCleared: false });
 }
 
 /**
